@@ -66,19 +66,19 @@ npm run dev
 
 Les captures ci-dessous sont integrees dans le repository:
 
-### Accueil
+#### Accueil
 
 ![TabibConnect Home](docs/screenshots/home.png)
 
-### Recherche medecins
+#### Recherche medecins
 
 ![TabibConnect Search](docs/screenshots/search.png)
 
-### Connexion
+#### Connexion
 
 ![TabibConnect Login](docs/screenshots/login.png)
 
-### Inscription
+#### Inscription
 
 ![TabibConnect Register](docs/screenshots/register.png)
 
