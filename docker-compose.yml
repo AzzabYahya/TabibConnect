@@ -1,0 +1,100 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tabibconnect}
+      POSTGRES_USER: ${POSTGRES_USER:-tabibconnect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_postgres_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-tabibconnect} -d ${POSTGRES_DB:-tabibconnect}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      APP_BASE_URL: ${APP_BASE_URL:-https://tabibconnect.ma}
+      FRONTEND_URL: ${FRONTEND_URL:-https://tabibconnect.ma}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://tabibconnect.ma}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://tabibconnect:change_me_postgres_password@postgres:5432/tabibconnect}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - '4000'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://tabibconnect.ma/api}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    expose:
+      - '80'
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infrastructure/nginx/certbot/www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ['certbot']
+    volumes:
+      - ./infrastructure/nginx/certbot/www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    entrypoint: >
+      sh -c "certbot certonly --webroot -w /var/www/certbot
+      --email ${LETSENCRYPT_EMAIL:-admin@tabibconnect.ma}
+      --agree-tos --no-eff-email
+      -d ${DOMAIN:-tabibconnect.ma}"
+
+volumes:
+  postgres_data:
+  redis_data:
+  letsencrypt:

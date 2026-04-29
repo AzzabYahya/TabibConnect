@@ -1,0 +1,33 @@
+# Secrets and environment files
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.test
+**/.env.*.local
+
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+**/build/
+**/coverage/
+**/test-results/
+**/.vite/
+
+# Generated / runtime data
+uploads/
+**/uploads/
+tmp/
+**/tmp/
+logs/
+**/logs/
+
+# OS and editor files
+.DS_Store
+**/.DS_Store
+
+# Local tooling caches
+.turbo/
+.cache/

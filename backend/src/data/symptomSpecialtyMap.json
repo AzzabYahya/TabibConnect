@@ -1,0 +1,50 @@
+{
+  "douleur thoracique": {
+    "specialites": ["Cardiologie"],
+    "keywords": ["douleur poitrine", "palpitations", "essoufflement"]
+  },
+  "palpitations": {
+    "specialites": ["Cardiologie"],
+    "keywords": ["coeur", "rythme cardiaque", "tachycardie"]
+  },
+  "maux de tete": {
+    "specialites": ["Neurologie"],
+    "keywords": ["migraine", "vertige", "trouble neurologique"]
+  },
+  "douleur estomac": {
+    "specialites": ["Gastro-enterologie"],
+    "keywords": ["reflux", "nausées", "ballonnements"]
+  },
+  "acne": {
+    "specialites": ["Dermatologie"],
+    "keywords": ["peau", "eruption", "eczema"]
+  },
+  "chute de cheveux": {
+    "specialites": ["Dermatologie"],
+    "keywords": ["alopecie", "cuir chevelu"]
+  },
+  "douleur articulation": {
+    "specialites": ["Rhumatologie", "Orthopedie"],
+    "keywords": ["genou", "hanche", "arthrite"]
+  },
+  "fatigue chronique": {
+    "specialites": ["Medecine interne", "Endocrinologie"],
+    "keywords": ["anemie", "thyroide", "metabolisme"]
+  },
+  "toux persistante": {
+    "specialites": ["Pneumologie"],
+    "keywords": ["asthme", "respiration", "bronches"]
+  },
+  "anxiete": {
+    "specialites": ["Psychiatrie", "Psychologie"],
+    "keywords": ["stress", "insomnie", "angoisse"]
+  },
+  "grossesse": {
+    "specialites": ["Gynecologie"],
+    "keywords": ["suivi prenatal", "obstetrique"]
+  },
+  "douleur dentaire": {
+    "specialites": ["Chirurgie dentaire"],
+    "keywords": ["carie", "gencive", "dent"]
+  }
+}

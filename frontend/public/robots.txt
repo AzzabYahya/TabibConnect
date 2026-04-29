@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /appointment/
+Sitemap: https://tabibconnect.ma/sitemap.xml

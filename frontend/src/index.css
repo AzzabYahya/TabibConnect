@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #1a6b8a;
+  --color-secondary: #2ecc8f;
+  --color-accent: #f4a62a;
+  --font-latin: 'Inter', sans-serif;
+  --font-arabic: 'Noto Sans Arabic', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-latin);
+  background-color: #eff6ff;
+  color: #0f172a;
+}
+
+html.search-page-locked,
+body.search-page-locked {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.search-page-locked {
+  overscroll-behavior: none;
+}
+
+html[dir='rtl'] body {
+  font-family: var(--font-arabic);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.leaflet-container {
+  font-family: var(--font-latin);
+}
+
+html[dir='rtl'] .leaflet-container {
+  font-family: var(--font-arabic);
+}
+
+.home-map-marker {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+}
+
+.home-map-popup .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+}
+
+.home-map-popup .leaflet-popup-content {
+  margin: 16px 18px;
+}
+
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background-color: rgba(26, 107, 138, 0.16);
+}
+
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+  background-color: #1a6b8a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.how-it-works-track::after {
+  content: '';
+  position: absolute;
+  left: 4rem;
+  right: 4rem;
+  top: 2.75rem;
+  border-top: 1px dashed rgba(26, 107, 138, 0.28);
+  background-image: linear-gradient(90deg, rgba(26, 107, 138, 0) 0%, rgba(26, 107, 138, 0.45) 50%, rgba(26, 107, 138, 0) 100%);
+  background-size: 200% 100%;
+  animation: how-it-works-flow 3s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.infinite-scroll-track {
+  animation: infiniteScroll 30s linear infinite;
+}
+
+.infinite-scroll-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes infiniteScroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes how-it-works-flow {
+  from {
+    background-position: 0% 0%;
+  }
+
+  to {
+    background-position: 200% 0%;
+  }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

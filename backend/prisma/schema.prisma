@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum Sexe {
+  HOMME
+  FEMME
+}
+
+enum GroupeSanguin {
+  O_POS
+  O_NEG
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+}
+
+enum DocumentVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  NEEDS_REVIEW
+}
+
+enum JourSemaine {
+  LUNDI
+  MARDI
+  MERCREDI
+  JEUDI
+  VENDREDI
+  SAMEDI
+  DIMANCHE
+}
+
+enum StatutRendezVous {
+  EN_ATTENTE
+  CONFIRME
+  ANNULE
+  COMPLETE
+  NO_SHOW
+}
+
+enum TypeConsultation {
+  PRESENTIEL
+  TELECONSULTATION
+}
+
+enum NotificationType {
+  RAPPEL_RDV
+  RDV_CONFIRME
+  RDV_ANNULE
+  PAIEMENT_RECU
+  SYSTEME
+}
+
+enum MethodePaiement {
+  CASH
+  CMI
+  VIREMENT
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  PAYE
+  ECHOUE
+  REMBOURSE
+}
+
+enum DoctorChangeRequestType {
+  PROFILE_UPDATE
+  LOCATION_CREATE
+  LOCATION_UPDATE
+}
+
+enum DoctorChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                         String         @id @default(cuid())
+  email                      String         @unique
+  password                   String
+  phone                      String         @unique
+  role                       UserRole
+  isVerified                 Boolean        @default(false)
+  refreshTokenHash           String?
+  refreshTokenExpiresAt      DateTime?
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash     String?
+  passwordResetExpiresAt     DateTime?
+  lastLoginAt                DateTime?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  patient                    Patient?
+  doctor                     Doctor?
+  notifications              Notification[]
+  reviewedDoctorChangeRequests DoctorChangeRequest[] @relation("DoctorChangeRequestReviewer")
+
+  @@index([role])
+  @@index([createdAt])
+  @@index([emailVerificationTokenHash])
+  @@index([passwordResetTokenHash])
+}
+
+model Patient {
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  cin             String       @unique
+  cinDocumentFileName String?
+  cinDocumentFilePath String?
+  cinDocumentMimeType String?
+  cinDocumentSize Int?
+  cinDocumentUploadedAt DateTime?
+  cinDocumentVerificationStatus DocumentVerificationStatus @default(PENDING)
+  cinDocumentVerificationScore Int?
+  cinDocumentVerificationNote String?
+  cinDocumentVerifiedAt DateTime?
+  cinDocumentRejectedAt DateTime?
+  dateOfNaissance DateTime
+  sexe            Sexe
+  adresse         String
+  ville           String
+  groupeSanguin   GroupeSanguin?
+  antecedents     String?
+  bookingWarnings Int          @default(0)
+  lastNoShowAt    DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rendezVous      RendezVous[]
+  avis            Avis[]
+  doctorNotes     DoctorPatientNote[]
+
+  @@index([ville])
+  @@index([sexe])
+  @@index([createdAt])
+}
+
+model Doctor {
+  id                  String          @id @default(cuid())
+  userId              String          @unique
+  inpe                String          @unique
+  cinDocumentFileName String?
+  cinDocumentFilePath String?
+  cinDocumentMimeType String?
+  cinDocumentSize Int?
+  cinDocumentUploadedAt DateTime?
+  cinDocumentVerificationStatus DocumentVerificationStatus @default(PENDING)
+  cinDocumentVerificationScore Int?
+  cinDocumentVerificationNote String?
+  cinDocumentVerifiedAt DateTime?
+  cinDocumentRejectedAt DateTime?
+  nomComplet          String?
+  specialite          String
+  diplomes            String[]
+  languesParlees      String[]
+  tarifConsultation   Decimal         @db.Decimal(10, 2)
+  accepteAssurance    Boolean         @default(false)
+  assurancesAcceptees String[]
+  bio                 String?
+  experience          Int
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doctorCabinets      DoctorCabinet[]
+  documents           DoctorDocument[]
+  disponibilites      Disponibilite[]
+  rendezVous          RendezVous[]
+  avisRecus           Avis[]
+  paiements           Paiement[]
+  patientNotes        DoctorPatientNote[]
+  changeRequests      DoctorChangeRequest[]
+
+  @@index([nomComplet])
+  @@index([specialite])
+  @@index([accepteAssurance])
+  @@index([experience])
+  @@index([createdAt])
+}
+
+model DoctorChangeRequest {
+  id               String                    @id @default(cuid())
+  doctorId         String
+  type             DoctorChangeRequestType
+  status           DoctorChangeRequestStatus @default(PENDING)
+  reason           String
+  payload          Json
+  reviewNote       String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  doctor           Doctor                    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  reviewedBy       User?                     @relation("DoctorChangeRequestReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([doctorId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model DoctorDocument {
+  id        String   @id @default(cuid())
+  doctorId  String
+  fileName  String
+  filePath  String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+}
+
+model Cabinet {
+  id             String          @id @default(cuid())
+  nom            String
+  adresse        String
+  ville          String
+  quartier       String
+  latitude       Decimal         @db.Decimal(9, 6)
+  longitude      Decimal         @db.Decimal(9, 6)
+  phone          String
+  photos         String[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  doctorCabinets DoctorCabinet[]
+  disponibilites Disponibilite[]
+  rendezVous     RendezVous[]
+
+  @@index([ville, quartier])
+  @@index([latitude, longitude])
+  @@index([createdAt])
+}
+
+model DoctorCabinet {
+  id        String   @id @default(cuid())
+  doctorId  String
+  cabinetId String
+  createdAt DateTime @default(now())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  cabinet   Cabinet  @relation(fields: [cabinetId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, cabinetId])
+  @@index([cabinetId])
+  @@index([doctorId])
+}
+
+model Disponibilite {
+  id                String       @id @default(cuid())
+  doctorId          String
+  cabinetId         String
+  jourSemaine       JourSemaine
+  heureDebut        String
+  heureFin          String
+  dureeConsultation Int
+  isActive          Boolean      @default(true)
+  bookingVersion    Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  doctor            Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  cabinet           Cabinet      @relation(fields: [cabinetId], references: [id], onDelete: Cascade)
+  rendezVous        RendezVous[]
+
+  @@unique([doctorId, cabinetId, jourSemaine, heureDebut, heureFin])
+  @@index([doctorId, jourSemaine, isActive])
+  @@index([cabinetId, jourSemaine, isActive])
+}
+
+model RendezVous {
+  id               String            @id @default(cuid())
+  patientId        String
+  doctorId         String
+  cabinetId        String?
+  disponibiliteId  String?
+  version          Int               @default(0)
+  statut           StatutRendezVous  @default(EN_ATTENTE)
+  methodePaiement  MethodePaiement   @default(CASH)
+  acceptedGeneralTerms Boolean       @default(false)
+  acceptedCashPolicy Boolean          @default(false)
+  motif            String
+  typeConsultation TypeConsultation
+  notes            String?
+  cancellationReason String?
+  cancelledAt      DateTime?
+  cancelledByRole  UserRole?
+  confirmedAt      DateTime?
+  completedAt      DateTime?
+  noShowAt         DateTime?
+  rappelEnvoye     Boolean           @default(false)
+  dateHeure        DateTime
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor           Doctor            @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  cabinet          Cabinet?          @relation(fields: [cabinetId], references: [id], onDelete: SetNull)
+  disponibilite    Disponibilite?    @relation(fields: [disponibiliteId], references: [id], onDelete: SetNull)
+  avis             Avis?
+  paiement         Paiement?
+  doctorPatientNotes DoctorPatientNote[]
+
+  @@index([doctorId, dateHeure])
+  @@index([patientId, dateHeure])
+  @@index([disponibiliteId, dateHeure])
+  @@index([cabinetId, dateHeure])
+  @@index([statut, dateHeure])
+  @@index([statut])
+  @@index([typeConsultation])
+  @@index([rappelEnvoye])
+}
+
+model DoctorPatientNote {
+  id               String    @id @default(cuid())
+  doctorId         String
+  patientId        String
+  rendezVousId     String
+  note             String
+  isVisibleToPeers Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  doctor           Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient          Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  rendezVous       RendezVous @relation(fields: [rendezVousId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, createdAt])
+  @@index([patientId, createdAt])
+  @@index([rendezVousId, createdAt])
+  @@index([isVisibleToPeers, createdAt])
+}
+
+model Avis {
+  id           String    @id @default(cuid())
+  patientId    String
+  doctorId     String
+  rendezVousId String    @unique
+  note         Int       @db.SmallInt
+  commentaire  String?
+  isVerified   Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  patient      Patient   @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor       Doctor    @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  rendezVous   RendezVous @relation(fields: [rendezVousId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, createdAt])
+  @@index([patientId, createdAt])
+  @@index([note])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  message   String
+  isRead    Boolean          @default(false)
+  userId    String
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([type, createdAt])
+}
+
+model Paiement {
+  id           String         @id @default(cuid())
+  rendezVousId String         @unique
+  doctorId     String
+  montant      Decimal        @db.Decimal(10, 2)
+  methode      MethodePaiement
+  statut       StatutPaiement @default(EN_ATTENTE)
+  reference    String         @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  rendezVous   RendezVous     @relation(fields: [rendezVousId], references: [id], onDelete: Cascade)
+  doctor       Doctor         @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+
+  @@index([doctorId, createdAt])
+  @@index([statut, createdAt])
+  @@index([methode, createdAt])
+}

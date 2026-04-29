@@ -1,0 +1,11 @@
+{
+  "name": "docma",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node scripts/run-platform.js",
+    "start": "node scripts/run-platform.js",
+    "backend": "npm --prefix backend run dev",
+    "frontend": "npm --prefix frontend run dev"
+  }
+}
