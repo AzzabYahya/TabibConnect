@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-04-29
+
+### Changed
+
+- Documentation Markdown rationalisee pour ne garder que les fichiers essentiels.
+- `README.md` remplace par une version operationnelle et concise.
+- Ajout de captures d'ecran plateforme dans `docs/screenshots/`.
+
 ## 1.0.0 - 2026-04-22
 
 ### Added
