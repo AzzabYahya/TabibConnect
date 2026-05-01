@@ -908,6 +908,448 @@ const createAccountByAdmin = async ({ payload, cinDocumentFile }) => {
   };
 };
 
+const clampPagination = ({ page = 1, limit = 20, maxLimit = 50 }) => {
+  const parsedPage = Number.parseInt(page, 10);
+  const parsedLimit = Number.parseInt(limit, 10);
+  const safePage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, maxLimit) : 20;
+  const skip = (safePage - 1) * safeLimit;
+  return { page: safePage, limit: safeLimit, skip };
+};
+
+const getAdminUsers = async ({ page, limit, role = 'ALL', search = '', city = 'ALL', status = 'ALL' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const q = String(search || '').trim();
+  const normalizedRole = String(role || 'ALL').toUpperCase();
+  const normalizedCity = String(city || 'ALL').trim();
+  const normalizedStatus = String(status || 'ALL').toUpperCase();
+
+  const where = {
+    ...(normalizedRole !== 'ALL' ? { role: normalizedRole } : {}),
+    ...(normalizedStatus === 'ACTIVE' ? { isVerified: true } : {}),
+    ...(normalizedStatus === 'INACTIVE' ? { isVerified: false } : {}),
+    ...(q
+      ? {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q, mode: 'insensitive' } },
+            { doctor: { nomComplet: { contains: q, mode: 'insensitive' } } },
+            { patient: { cin: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+    ...(normalizedCity !== 'ALL'
+      ? {
+          OR: [
+            { patient: { ville: { equals: normalizedCity, mode: 'insensitive' } } },
+            {
+              doctor: {
+                doctorCabinets: {
+                  some: {
+                    cabinet: { ville: { equals: normalizedCity, mode: 'insensitive' } },
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip,
+      take: safeLimit,
+      include: {
+        patient: { select: { id: true, ville: true, cin: true, dateOfNaissance: true, sexe: true, antecedents: true } },
+        doctor: {
+          include: {
+            doctorCabinets: {
+              include: { cabinet: { select: { ville: true, quartier: true, nom: true } } },
+              take: 1,
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    items: items.map((user) => ({
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      name: user.doctor?.nomComplet || toDisplayName(user.email),
+      city: user.patient?.ville || user.doctor?.doctorCabinets?.[0]?.cabinet?.ville || null,
+      patient: user.patient,
+      doctor: user.doctor
+        ? {
+            id: user.doctor.id,
+            nomComplet: user.doctor.nomComplet,
+            specialite: user.doctor.specialite,
+            inpe: user.doctor.inpe,
+            experience: user.doctor.experience,
+          }
+        : null,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
+const getAdminLogs = async ({ page, limit, type = 'ALL' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const normalizedType = String(type || 'ALL').toUpperCase();
+
+  const [total, notifications, appointments, payments, users] = await Promise.all([
+    Promise.all([
+      prisma.notification.count({ where: normalizedType === 'ALL' || normalizedType === 'NOTIFICATION' ? {} : { id: { equals: '__none__' } } }),
+      prisma.rendezVous.count({ where: normalizedType === 'ALL' || normalizedType === 'RDV' ? {} : { id: { equals: '__none__' } } }),
+      prisma.paiement.count({ where: normalizedType === 'ALL' || normalizedType === 'PAIEMENT' ? {} : { id: { equals: '__none__' } } }),
+      prisma.user.count({ where: normalizedType === 'ALL' || normalizedType === 'AUTH' ? {} : { id: { equals: '__none__' } } }),
+    ]).then((counts) => counts.reduce((acc, n) => acc + n, 0)),
+    prisma.notification.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: normalizedType === 'ALL' || normalizedType === 'NOTIFICATION' ? 120 : 0,
+      include: { user: { select: { email: true } } },
+    }),
+    prisma.rendezVous.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: normalizedType === 'ALL' || normalizedType === 'RDV' ? 120 : 0,
+      include: { doctor: { select: { nomComplet: true } }, patient: { include: { user: { select: { email: true } } } } },
+    }),
+    prisma.paiement.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: normalizedType === 'ALL' || normalizedType === 'PAIEMENT' ? 120 : 0,
+      include: { doctor: { select: { nomComplet: true } } },
+    }),
+    prisma.user.findMany({
+      orderBy: { lastLoginAt: 'desc' },
+      take: normalizedType === 'ALL' || normalizedType === 'AUTH' ? 120 : 0,
+      select: { id: true, email: true, role: true, lastLoginAt: true, createdAt: true },
+    }),
+  ]);
+
+  const merged = [
+    ...notifications.map((n) => ({ id: `N-${n.id}`, type: 'NOTIFICATION', at: n.createdAt, label: `${n.type} -> ${n.user?.email || 'N/A'}` })),
+    ...appointments.map((a) => ({ id: `R-${a.id}`, type: 'RDV', at: a.updatedAt, label: `${a.statut} • ${a.doctor?.nomComplet || 'Médecin'} / ${a.patient?.user?.email || 'Patient'}` })),
+    ...payments.map((p) => ({ id: `P-${p.id}`, type: 'PAIEMENT', at: p.updatedAt, label: `${p.statut} • ${Number(p.montant)} MAD` })),
+    ...users
+      .filter((u) => u.lastLoginAt)
+      .map((u) => ({ id: `A-${u.id}`, type: 'AUTH', at: u.lastLoginAt, label: `Connexion ${u.role} • ${u.email}` })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  const items = merged.slice(skip, skip + safeLimit);
+  return {
+    items,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
+const getAdminMetrics = async () => {
+  const now = new Date();
+  const eightWeeksAgo = new Date(now);
+  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 7 * 8);
+
+  const [appointments, doctorsBySpecialty, usersByCity] = await Promise.all([
+    prisma.rendezVous.findMany({
+      where: { createdAt: { gte: eightWeeksAgo } },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.doctor.groupBy({ by: ['specialite'], _count: { _all: true } }),
+    prisma.patient.groupBy({ by: ['ville'], _count: { _all: true } }),
+  ]);
+
+  const weekBuckets = {};
+  appointments.forEach((entry) => {
+    const date = new Date(entry.createdAt);
+    const start = new Date(date);
+    const day = start.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    start.setDate(start.getDate() + diff);
+    start.setHours(0, 0, 0, 0);
+    const key = start.toISOString().slice(0, 10);
+    weekBuckets[key] = (weekBuckets[key] || 0) + 1;
+  });
+
+  return {
+    appointmentsByWeek: Object.entries(weekBuckets).map(([week, count]) => ({ week, count })),
+    specialtyDistribution: doctorsBySpecialty.map((row) => ({ name: row.specialite, value: row._count._all })),
+    cityDistribution: usersByCity.map((row) => ({ city: row.ville, count: row._count._all })),
+  };
+};
+
+const getAdminDoctors = async ({ page, limit, status = 'ALL', search = '' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const normalizedStatus = String(status || 'ALL').toUpperCase();
+  const q = String(search || '').trim();
+
+  const where = {
+    ...(normalizedStatus === 'PENDING' ? { user: { isVerified: false } } : {}),
+    ...(normalizedStatus === 'VERIFIED' ? { user: { isVerified: true } } : {}),
+    ...(q
+      ? {
+          OR: [
+            { inpe: { contains: q, mode: 'insensitive' } },
+            { specialite: { contains: q, mode: 'insensitive' } },
+            { nomComplet: { contains: q, mode: 'insensitive' } },
+            { user: { email: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.doctor.count({ where }),
+    prisma.doctor.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip,
+      take: safeLimit,
+      include: {
+        user: { select: { id: true, email: true, phone: true, isVerified: true, createdAt: true } },
+        doctorCabinets: {
+          include: { cabinet: { select: { id: true, nom: true, ville: true, quartier: true, adresse: true } } },
+        },
+        documents: { select: { id: true, fileName: true, mimeType: true, size: true, createdAt: true } },
+      },
+    }),
+  ]);
+
+  return {
+    items: items.map((doc) => ({
+      id: doc.id,
+      userId: doc.userId,
+      name: doc.nomComplet || toDisplayName(doc.user.email),
+      email: doc.user.email,
+      phone: doc.user.phone,
+      inpe: doc.inpe,
+      specialty: doc.specialite,
+      city: doc.doctorCabinets?.[0]?.cabinet?.ville || null,
+      isVerified: doc.user.isVerified,
+      createdAt: doc.createdAt,
+      cinDocument: doc.cinDocumentFileName
+        ? {
+            fileName: doc.cinDocumentFileName,
+            filePath: doc.cinDocumentFilePath,
+            mimeType: doc.cinDocumentMimeType,
+            size: doc.cinDocumentSize,
+            uploadedAt: doc.cinDocumentUploadedAt,
+            verificationStatus: doc.cinDocumentVerificationStatus,
+            verificationScore: doc.cinDocumentVerificationScore,
+            verificationNote: doc.cinDocumentVerificationNote,
+          }
+        : null,
+      cabinets: (doc.doctorCabinets || []).map((entry) => entry.cabinet),
+      documents: doc.documents || [],
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
+const rejectDoctor = async ({ doctorId, reason }) => {
+  const message = String(reason || '').trim();
+  if (!message) {
+    throw new HttpError(400, 'reason is required');
+  }
+
+  const doctor = await prisma.doctor.findUnique({
+    where: { id: doctorId },
+    include: { user: { select: { id: true, email: true } } },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor not found');
+  }
+
+  await prisma.doctor.update({
+    where: { id: doctorId },
+    data: {
+      cinDocumentVerificationStatus: 'REJECTED',
+      cinDocumentVerificationNote: message,
+      cinDocumentRejectedAt: new Date(),
+    },
+  });
+  await prisma.user.update({ where: { id: doctor.userId }, data: { isVerified: false } });
+
+  return { id: doctorId, rejected: true };
+};
+
+const getAdminReviews = async ({ page, limit, status = 'PENDING', search = '' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const normalizedStatus = String(status || 'PENDING').toUpperCase();
+  const q = String(search || '').trim();
+
+  const where = {
+    ...(normalizedStatus === 'PENDING' ? { isVerified: false } : {}),
+    ...(normalizedStatus === 'VERIFIED' ? { isVerified: true } : {}),
+    ...(q
+      ? {
+          OR: [
+            { commentaire: { contains: q, mode: 'insensitive' } },
+            { doctor: { nomComplet: { contains: q, mode: 'insensitive' } } },
+            { doctor: { user: { email: { contains: q, mode: 'insensitive' } } } },
+            { patient: { user: { email: { contains: q, mode: 'insensitive' } } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.avis.count({ where }),
+    prisma.avis.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip,
+      take: safeLimit,
+      include: {
+        patient: { include: { user: { select: { email: true } } } },
+        doctor: { include: { user: { select: { email: true } } } },
+      },
+    }),
+  ]);
+
+  return {
+    items: items.map((review) => ({
+      id: review.id,
+      rating: review.note,
+      comment: review.commentaire || '',
+      isVerified: review.isVerified,
+      createdAt: review.createdAt,
+      doctor: {
+        id: review.doctorId,
+        name: review.doctor?.nomComplet || toDisplayName(review.doctor?.user?.email),
+        email: review.doctor?.user?.email || null,
+        specialty: review.doctor?.specialite || null,
+      },
+      patient: {
+        id: review.patientId,
+        name: toDisplayName(review.patient?.user?.email),
+        email: review.patient?.user?.email || null,
+      },
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
+const rejectReview = async ({ reviewId, reason }) => {
+  const message = String(reason || '').trim();
+  if (!message) {
+    throw new HttpError(400, 'reason is required');
+  }
+
+  const review = await prisma.avis.findUnique({ where: { id: reviewId }, select: { id: true } });
+  if (!review) {
+    throw new HttpError(404, 'Review not found');
+  }
+
+  await prisma.avis.delete({ where: { id: reviewId } });
+  return { id: reviewId, deleted: true, reason: message };
+};
+
+const getAdminNotifications = async ({ page, limit, isRead = 'ALL', search = '' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const normalizedIsRead = String(isRead || 'ALL').toUpperCase();
+  const q = String(search || '').trim();
+
+  const where = {
+    ...(normalizedIsRead === 'READ' ? { isRead: true } : {}),
+    ...(normalizedIsRead === 'UNREAD' ? { isRead: false } : {}),
+    ...(q
+      ? {
+          OR: [
+            { message: { contains: q, mode: 'insensitive' } },
+            { user: { email: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.notification.count({ where }),
+    prisma.notification.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip,
+      take: safeLimit,
+      include: { user: { select: { id: true, email: true, role: true } } },
+    }),
+  ]);
+
+  return {
+    items: items.map((n) => ({
+      id: n.id,
+      type: n.type,
+      message: n.message,
+      isRead: n.isRead,
+      createdAt: n.createdAt,
+      user: n.user,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
+const markNotificationsRead = async ({ ids }) => {
+  const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
+  if (!list.length) {
+    throw new HttpError(400, 'ids is required');
+  }
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: list } },
+    data: { isRead: true },
+  });
+  return { updated: result.count };
+};
+
+const disableUser = async ({ userId }) => {
+  const account = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!account) {
+    throw new HttpError(404, 'Account not found');
+  }
+  await prisma.user.update({ where: { id: userId }, data: { isVerified: false } });
+  return { id: userId, disabled: true };
+};
+
 module.exports = {
   getAdminDashboard,
   getAdminAccountDetails,
@@ -917,4 +1359,14 @@ module.exports = {
   createAccountByAdmin,
   verifyDoctor,
   verifyReview,
+  getAdminUsers,
+  getAdminLogs,
+  getAdminMetrics,
+  getAdminDoctors,
+  rejectDoctor,
+  getAdminReviews,
+  rejectReview,
+  getAdminNotifications,
+  markNotificationsRead,
+  disableUser,
 };

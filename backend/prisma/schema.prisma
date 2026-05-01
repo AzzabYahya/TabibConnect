@@ -92,6 +92,12 @@ enum DoctorChangeRequestStatus {
   REJECTED
 }
 
+enum PatientChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                         String         @id @default(cuid())
   email                      String         @unique
@@ -112,6 +118,7 @@ model User {
   doctor                     Doctor?
   notifications              Notification[]
   reviewedDoctorChangeRequests DoctorChangeRequest[] @relation("DoctorChangeRequestReviewer")
+  reviewedPatientChangeRequests PatientChangeRequest[] @relation("PatientChangeRequestReviewer")
 
   @@index([role])
   @@index([createdAt])
@@ -147,10 +154,29 @@ model Patient {
   rendezVous      RendezVous[]
   avis            Avis[]
   doctorNotes     DoctorPatientNote[]
+  changeRequests  PatientChangeRequest[]
 
   @@index([ville])
   @@index([sexe])
   @@index([createdAt])
+}
+
+model PatientChangeRequest {
+  id               String                    @id @default(cuid())
+  patientId        String
+  status           PatientChangeRequestStatus @default(PENDING)
+  reason           String
+  payload          Json
+  reviewNote       String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  patient          Patient                   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  reviewedBy       User?                     @relation("PatientChangeRequestReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model Doctor {

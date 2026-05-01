@@ -43,6 +43,22 @@ html[dir='rtl'] body {
   box-sizing: border-box;
 }
 
+p,
+span,
+strong,
+a,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+td,
+th {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .leaflet-container {
   font-family: var(--font-latin);
 }

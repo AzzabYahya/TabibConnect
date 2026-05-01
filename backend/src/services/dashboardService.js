@@ -393,6 +393,7 @@ const getPatientDashboard = async ({ userId }) => {
       displayName: toDisplayName(patient.user.email),
       email: patient.user.email,
       phone: patient.user.phone,
+      cin: patient.cin,
       city: patient.ville,
       address: patient.adresse,
       age,
@@ -412,6 +413,7 @@ const getPatientDashboard = async ({ userId }) => {
     favoriteDoctors,
     notifications: notifications.map(mapNotification),
     medicalProfile: {
+      cin: patient.cin,
       address: patient.adresse,
       city: patient.ville,
       dateOfBirth: patient.dateOfNaissance.toISOString().slice(0, 10),
@@ -428,7 +430,132 @@ const getPatientDashboard = async ({ userId }) => {
   };
 };
 
+const getPatientHistory = async ({ userId, page = 1, limit = 20, status = 'ALL' }) => {
+  const patient = await getPatientContext(userId);
+  const now = new Date();
+  const currentPage = Math.max(1, Number(page));
+  const pageSize = Math.min(50, Math.max(1, Number(limit)));
+  const normalizedStatus = String(status || 'ALL').toUpperCase();
+
+  const where = {
+    patientId: patient.id,
+    ...(normalizedStatus !== 'ALL' ? { statut: normalizedStatus } : {}),
+  };
+
+  const [appointments, total] = await Promise.all([
+    prisma.rendezVous.findMany({
+      where,
+      include: {
+        cabinet: true,
+        disponibilite: { select: { dureeConsultation: true } },
+        doctor: { include: { user: { select: { email: true } }, doctorCabinets: { include: { cabinet: { select: { ville: true } } } } } },
+        avis: { select: { note: true, commentaire: true } },
+      },
+      orderBy: [{ dateHeure: 'desc' }],
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.rendezVous.count({ where }),
+  ]);
+
+  const mapped = appointments.map((appointment) => mapAppointment(appointment, now));
+  return {
+    items: mapped.map((appointment) => ({
+      id: appointment.id,
+      doctorId: appointment.doctorId,
+      doctorName: appointment.doctorName,
+      specialty: appointment.specialty,
+      dateTime: appointment.dateTime,
+      status: appointment.status,
+      type: appointment.type,
+      city: appointment.city,
+      rating: appointment.review?.rating || null,
+      canReview: appointment.canReview,
+      reviewReceived: appointment.reviewReceived,
+    })),
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasNextPage: currentPage * pageSize < total,
+      hasPrevPage: currentPage > 1,
+    },
+  };
+};
+
+const getPatientRecurringDoctors = async ({ userId }) => {
+  const patient = await getPatientContext(userId);
+  const appointments = await prisma.rendezVous.findMany({
+    where: { patientId: patient.id },
+    select: { doctorId: true },
+  });
+  const counts = appointments.reduce((acc, a) => {
+    acc[a.doctorId] = (acc[a.doctorId] || 0) + 1;
+    return acc;
+  }, {});
+  const recurringIds = Object.entries(counts)
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id]) => id);
+
+  const doctors = await prisma.doctor.findMany({
+    where: { id: { in: recurringIds } },
+    include: { user: { select: { email: true } } },
+  });
+
+  return recurringIds.map((id) => {
+    const d = doctors.find((x) => x.id === id);
+    return d
+      ? { id: d.id, name: d.nomComplet || toDisplayName(d.user.email), specialty: d.specialite, count: counts[id] }
+      : { id, name: 'Médecin', specialty: null, count: counts[id] };
+  });
+};
+
+const getPatientNotifications = async ({ userId, page = 1, limit = 20 }) => {
+  const patient = await getPatientContext(userId);
+  const currentPage = Math.max(1, Number(page));
+  const pageSize = Math.min(50, Math.max(1, Number(limit)));
+
+  const where = { userId: patient.userId };
+  const [notifications, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.notification.count({ where }),
+  ]);
+
+  return {
+    items: notifications.map(mapNotification),
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasNextPage: currentPage * pageSize < total,
+      hasPrevPage: currentPage > 1,
+    },
+  };
+};
+
+const markPatientNotificationsRead = async ({ userId }) => {
+  const patient = await getPatientContext(userId);
+  const result = await prisma.notification.updateMany({
+    where: { userId: patient.userId, isRead: false },
+    data: { isRead: true },
+  });
+  return { updated: result.count };
+};
+
 module.exports = {
   getAppointmentDetails,
   getPatientDashboard,
+  getPatientHistory,
+  getPatientRecurringDoctors,
+  getPatientNotifications,
+  markPatientNotificationsRead,
 };

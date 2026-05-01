@@ -14,6 +14,12 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/patient', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientDashboard));
+router.get('/patient/history', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientHistory));
+router.get('/patient/recurring-doctors', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientRecurringDoctors));
+router.get('/patient/notifications', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientNotifications));
+router.post('/patient/notifications/mark-read', authorize(['PATIENT']), asyncHandler(dashboardController.markPatientNotificationsRead));
+router.post('/patient/change-requests', authorize(['PATIENT']), asyncHandler(dashboardController.submitPatientChangeRequest));
+router.get('/patient/change-requests', authorize(['PATIENT']), asyncHandler(dashboardController.listMyPatientChangeRequests));
 router.get('/doctor', authorize(['DOCTOR']), asyncHandler(dashboardController.getDoctorDashboard));
 router.get('/admin', authorize(['ADMIN']), asyncHandler(dashboardController.getAdminDashboard));
 router.post(

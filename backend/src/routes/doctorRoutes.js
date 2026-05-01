@@ -46,6 +46,41 @@ router.get(
   asyncHandler(doctorController.getDoctorProfileManagement)
 );
 
+router.get(
+  '/me/agenda',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.getDoctorAgenda)
+);
+
+router.get(
+  '/me/patients',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.listDoctorPatients)
+);
+
+router.get(
+  '/me/reviews',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.getDoctorReceivedReviews)
+);
+
+router.get(
+  '/me/patients/:patientId/history',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.getDoctorPatientHistory)
+);
+
+router.get(
+  '/me/stats',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.getDoctorStats)
+);
+
 router.post(
   '/me/availabilities',
   authenticate,

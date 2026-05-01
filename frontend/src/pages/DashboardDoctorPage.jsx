@@ -32,6 +32,7 @@ import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 import { formatSpecialtyLabel } from '../lib/frenchText';
 import { MOROCCO_CITY_SELECT_OPTIONS } from '../lib/moroccoCities';
+import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
 
 const MotionDiv = motion.div;
 
@@ -225,6 +226,15 @@ function DashboardDoctorPage() {
     queryFn: async () => {
       const response = await api.get('/doctors/me/change-requests');
       return response.data?.data || [];
+    },
+  });
+
+  useRealtimeDashboard({
+    onNotification: () => {
+      dashboardQuery.refetch();
+    },
+    onDoctorPending: () => {
+      dashboardQuery.refetch();
     },
   });
 

@@ -27,6 +27,7 @@ import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 import { formatSpecialtyLabel } from '../lib/frenchText';
 import { MOROCCO_CITY_SELECT_OPTIONS } from '../lib/moroccoCities';
+import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
 
 const MotionDiv = motion.div;
 
@@ -86,6 +87,12 @@ function DashboardAdminPage() {
     queryFn: async () => {
       const response = await api.get('/dashboard/admin');
       return response.data?.data || fallbackAdminDashboard;
+    },
+  });
+
+  useRealtimeDashboard({
+    onNotification: () => {
+      dashboardQuery.refetch();
     },
   });
 

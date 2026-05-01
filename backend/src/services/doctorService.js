@@ -722,6 +722,327 @@ const cancelDoctorChangeRequest = async ({ userId, requestId }) => {
   });
 };
 
+const getDoctorAgenda = async ({ userId, weekStartISO }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const base = weekStartISO ? new Date(weekStartISO) : new Date();
+  if (!Number.isFinite(base.getTime())) {
+    throw new HttpError(400, 'weekStart must be a valid ISO date');
+  }
+  // Normalize to Monday 00:00
+  const start = new Date(base);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+
+  const appointments = await prisma.rendezVous.findMany({
+    where: {
+      doctorId: doctor.id,
+      dateHeure: { gte: start, lt: end },
+    },
+    orderBy: [{ dateHeure: 'asc' }],
+    include: {
+      patient: { include: { user: { select: { email: true, phone: true } } } },
+      cabinet: true,
+    },
+  });
+
+  const toFirstName = (email) => {
+    const local = String(email || '').split('@')[0].trim();
+    const first = local.split(/[._\s-]+/).filter(Boolean)[0] || local;
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : 'Patient';
+  };
+
+  return {
+    weekStart: start.toISOString().slice(0, 10),
+    weekEnd: new Date(end.getTime() - 1).toISOString().slice(0, 10),
+    items: appointments.map((rdv) => ({
+      id: rdv.id,
+      dateTime: rdv.dateHeure.toISOString(),
+      status: rdv.statut,
+      type: rdv.typeConsultation,
+      reason: rdv.motif,
+      notes: rdv.notes || null,
+      cancellationReason: rdv.cancellationReason || null,
+      patient: {
+        id: rdv.patientId,
+        firstName: toFirstName(rdv.patient?.user?.email),
+        email: rdv.patient?.user?.email || null,
+        phone: rdv.patient?.user?.phone || null,
+      },
+      cabinet: rdv.cabinet
+        ? {
+            id: rdv.cabinet.id,
+            name: rdv.cabinet.nom,
+            city: rdv.cabinet.ville,
+            district: rdv.cabinet.quartier,
+            address: rdv.cabinet.adresse,
+            latitude: Number(rdv.cabinet.latitude),
+            longitude: Number(rdv.cabinet.longitude),
+          }
+        : null,
+    })),
+  };
+};
+
+const listDoctorPatients = async ({ userId, page = 1, limit = 15, search = '' }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const currentPage = Math.max(1, Number(page));
+  const pageSize = Math.min(50, Math.max(1, Number(limit)));
+  const q = String(search || '').trim().toLowerCase();
+
+  const grouped = await prisma.rendezVous.groupBy({
+    by: ['patientId'],
+    where: { doctorId: doctor.id },
+    _count: { _all: true },
+    _max: { dateHeure: true },
+  });
+
+  const patientIds = grouped.map((g) => g.patientId);
+  const patients = await prisma.patient.findMany({
+    where: {
+      id: { in: patientIds },
+    },
+    include: {
+      user: { select: { email: true, phone: true } },
+    },
+  });
+
+  const toFirstName = (email) => {
+    const local = String(email || '').split('@')[0].trim();
+    const first = local.split(/[._\s-]+/).filter(Boolean)[0] || local;
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : 'Patient';
+  };
+
+  const merged = patients
+    .map((p) => {
+      const g = grouped.find((x) => x.patientId === p.id);
+      return {
+        id: p.id,
+        firstName: toFirstName(p.user?.email),
+        email: p.user?.email || null,
+        phone: p.user?.phone || null,
+        city: p.ville,
+        lastVisit: g?._max?.dateHeure ? new Date(g._max.dateHeure).toISOString() : null,
+        consultations: g?._count?._all || 0,
+      };
+    })
+    .filter((p) => {
+      if (!q) return true;
+      return (
+        String(p.firstName || '').toLowerCase().includes(q) ||
+        String(p.email || '').toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => new Date(b.lastVisit || 0).getTime() - new Date(a.lastVisit || 0).getTime());
+
+  const total = merged.length;
+  const start = (currentPage - 1) * pageSize;
+  const items = merged.slice(start, start + pageSize);
+
+  return {
+    items,
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasNextPage: start + items.length < total,
+      hasPrevPage: currentPage > 1,
+    },
+  };
+};
+
+const getDoctorReceivedReviews = async ({ userId, page = 1, limit = 15, sort = 'recent' }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const currentPage = Math.max(1, Number(page));
+  const pageSize = Math.min(50, Math.max(1, Number(limit)));
+  const orderBy =
+    String(sort) === 'best'
+      ? [{ note: 'desc' }, { createdAt: 'desc' }]
+      : String(sort) === 'worst'
+        ? [{ note: 'asc' }, { createdAt: 'desc' }]
+        : [{ createdAt: 'desc' }];
+
+  const [reviews, total] = await Promise.all([
+    prisma.avis.findMany({
+      where: { doctorId: doctor.id, isVerified: true },
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+      orderBy,
+      include: { patient: { include: { user: { select: { email: true } } } } },
+    }),
+    prisma.avis.count({ where: { doctorId: doctor.id, isVerified: true } }),
+  ]);
+
+  const toFirstName = (email) => {
+    const local = String(email || '').split('@')[0].trim();
+    const first = local.split(/[._\s-]+/).filter(Boolean)[0] || local;
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : 'Patient';
+  };
+
+  return {
+    items: reviews.map((r) => ({
+      id: r.id,
+      rating: r.note,
+      comment: r.commentaire || '',
+      createdAt: r.createdAt,
+      patientFirstName: toFirstName(r.patient?.user?.email),
+    })),
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasNextPage: currentPage * pageSize < total,
+      hasPrevPage: currentPage > 1,
+    },
+  };
+};
+
+const getDoctorPatientHistory = async ({ userId, patientId, page = 1, limit = 20 }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const currentPage = Math.max(1, Number(page));
+  const pageSize = Math.min(50, Math.max(1, Number(limit)));
+
+  const where = { doctorId: doctor.id, patientId };
+  const [items, total] = await Promise.all([
+    prisma.rendezVous.findMany({
+      where,
+      orderBy: [{ dateHeure: 'desc' }],
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+      include: {
+        cabinet: true,
+        avis: { select: { note: true, commentaire: true, isVerified: true } },
+        doctorPatientNotes: {
+          where: { doctorId: doctor.id },
+          orderBy: [{ createdAt: 'desc' }],
+          take: 10,
+        },
+      },
+    }),
+    prisma.rendezVous.count({ where }),
+  ]);
+
+  return {
+    items: items.map((rdv) => ({
+      id: rdv.id,
+      dateTime: rdv.dateHeure.toISOString(),
+      status: rdv.statut,
+      reason: rdv.motif,
+      type: rdv.typeConsultation,
+      notes: rdv.notes || null,
+      cancellationReason: rdv.cancellationReason || null,
+      cabinet: rdv.cabinet
+        ? { id: rdv.cabinet.id, name: rdv.cabinet.nom, city: rdv.cabinet.ville, district: rdv.cabinet.quartier }
+        : null,
+      review: rdv.avis ? { rating: rdv.avis.note, comment: rdv.avis.commentaire || '', verified: rdv.avis.isVerified } : null,
+      doctorNotes: rdv.doctorPatientNotes.map((n) => ({ id: n.id, note: n.note, createdAt: n.createdAt.toISOString() })),
+    })),
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasNextPage: currentPage * pageSize < total,
+      hasPrevPage: currentPage > 1,
+    },
+  };
+};
+
+const getDoctorStats = async ({ userId }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const startOfWeek = new Date(now);
+  const day = startOfWeek.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  startOfWeek.setDate(startOfWeek.getDate() + diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+  const [thisMonthCount, prevMonthCount, weekAppointments, avgNote, noteCount, activeAvailabilities] = await Promise.all([
+    prisma.rendezVous.count({ where: { doctorId: doctor.id, createdAt: { gte: startOfMonth } } }),
+    prisma.rendezVous.count({ where: { doctorId: doctor.id, createdAt: { gte: startOfPrevMonth, lt: endOfPrevMonth } } }),
+    prisma.rendezVous.findMany({
+      where: { doctorId: doctor.id, dateHeure: { gte: startOfWeek, lt: endOfWeek } },
+      select: { dateHeure: true },
+    }),
+    prisma.avis.aggregate({ where: { doctorId: doctor.id, isVerified: true }, _avg: { note: true } }),
+    prisma.avis.count({ where: { doctorId: doctor.id, isVerified: true } }),
+    prisma.disponibilite.count({ where: { doctorId: doctor.id, isActive: true } }),
+  ]);
+
+  const byDay = {};
+  weekAppointments.forEach((a) => {
+    const key = new Date(a.dateHeure).toISOString().slice(0, 10);
+    byDay[key] = (byDay[key] || 0) + 1;
+  });
+
+  const series = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(d.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    return { day: key, count: byDay[key] || 0 };
+  });
+
+  const evolution = prevMonthCount === 0 ? (thisMonthCount > 0 ? 100 : 0) : Math.round(((thisMonthCount - prevMonthCount) / prevMonthCount) * 100);
+
+  // Occupation is approximated using active availabilities count as a proxy (no slot table).
+  const occupationRate = activeAvailabilities ? Math.min(100, Math.round((thisMonthCount / (activeAvailabilities * 8)) * 100)) : 0;
+
+  return {
+    thisMonthAppointments: thisMonthCount,
+    evolutionVsPrevMonthPct: evolution,
+    occupationRatePct: occupationRate,
+    averageRating: avgNote._avg.note ? Number(avgNote._avg.note.toFixed(1)) : 0,
+    reviewsCount: noteCount,
+    weekSeries: series,
+  };
+};
+
 module.exports = {
   getDoctorAvailabilitiesForDate,
   getDoctorProfile,
@@ -737,4 +1058,9 @@ module.exports = {
   updateDoctorChangeRequest,
   cancelDoctorChangeRequest,
   updateDoctorProfile,
+  getDoctorAgenda,
+  listDoctorPatients,
+  getDoctorReceivedReviews,
+  getDoctorPatientHistory,
+  getDoctorStats,
 };

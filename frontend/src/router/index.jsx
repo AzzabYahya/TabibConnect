@@ -11,11 +11,28 @@ import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import RegisterPage from '../pages/RegisterPage';
 import SettingsPage from '../pages/SettingsPage';
+import PaymentSuccessPage from '../pages/PaymentSuccessPage';
+import PaymentCancelPage from '../pages/PaymentCancelPage';
+import AdminDashboardLayout from '../layout/AdminDashboardLayout';
+import DoctorDashboardLayout from '../layout/DoctorDashboardLayout';
+import PatientDashboardLayout from '../layout/PatientDashboardLayout';
 
 const searchPageLoader = lazy(() => import('../pages/SearchPage'));
 const dashboardPatientPageLoader = lazy(() => import('../pages/DashboardPatientPage'));
-const dashboardDoctorPageLoader = lazy(() => import('../pages/DashboardDoctorPage'));
-const dashboardAdminPageLoader = lazy(() => import('../pages/DashboardAdminPage'));
+const adminOverviewPageLoader = lazy(() => import('../pages/AdminOverviewPage'));
+const adminUsersPageLoader = lazy(() => import('../pages/AdminUsersPage'));
+const adminDoctorsPageLoader = lazy(() => import('../pages/AdminDoctorsPage'));
+const adminReviewsPageLoader = lazy(() => import('../pages/AdminReviewsPage'));
+const adminMetricsPageLoader = lazy(() => import('../pages/AdminMetricsPage'));
+const adminLogsPageLoader = lazy(() => import('../pages/AdminLogsPage'));
+const adminNotificationsPageLoader = lazy(() => import('../pages/AdminNotificationsPage'));
+
+const doctorAgendaPageLoader = lazy(() => import('../pages/DoctorAgendaPage'));
+const doctorAvailabilityPageLoader = lazy(() => import('../pages/DoctorAvailabilityPage'));
+const doctorPatientsPageLoader = lazy(() => import('../pages/DoctorPatientsPage'));
+const doctorProfileCabinetPageLoader = lazy(() => import('../pages/DoctorProfileCabinetPage'));
+const doctorStatsPageLoader = lazy(() => import('../pages/DoctorStatsPage'));
+const doctorReviewsPageLoader = lazy(() => import('../pages/DoctorReviewsPage'));
 
 const withRouteSuspense = (element) => (
   <Suspense
@@ -78,9 +95,12 @@ const router = createBrowserRouter([
             title="Continuez votre réservation"
             subtitle="Créez un compte ou connectez-vous pour consulter votre espace patient."
           >
-            {withRouteSuspense(createElement(dashboardPatientPageLoader))}
+            <PatientDashboardLayout />
           </PrivateRoute>
         ),
+        children: [
+          { index: true, element: withRouteSuspense(createElement(dashboardPatientPageLoader)) },
+        ],
       },
       {
         path: 'dashboard/doctor',
@@ -90,9 +110,17 @@ const router = createBrowserRouter([
             title="Continuez votre réservation"
             subtitle="Créez un compte ou connectez-vous pour consulter votre espace médecin."
           >
-            {withRouteSuspense(createElement(dashboardDoctorPageLoader))}
+            <DoctorDashboardLayout />
           </PrivateRoute>
         ),
+        children: [
+          { index: true, element: withRouteSuspense(createElement(doctorAgendaPageLoader)) },
+          { path: 'availability', element: withRouteSuspense(createElement(doctorAvailabilityPageLoader)) },
+          { path: 'patients', element: withRouteSuspense(createElement(doctorPatientsPageLoader)) },
+          { path: 'profile', element: withRouteSuspense(createElement(doctorProfileCabinetPageLoader)) },
+          { path: 'stats', element: withRouteSuspense(createElement(doctorStatsPageLoader)) },
+          { path: 'reviews', element: withRouteSuspense(createElement(doctorReviewsPageLoader)) },
+        ],
       },
       {
         path: 'dashboard/admin',
@@ -102,9 +130,39 @@ const router = createBrowserRouter([
             title="Continuez votre réservation"
             subtitle="Créez un compte ou connectez-vous pour consulter votre espace administrateur."
           >
-            {withRouteSuspense(createElement(dashboardAdminPageLoader))}
+            <AdminDashboardLayout />
           </PrivateRoute>
         ),
+        children: [
+          {
+            index: true,
+            element: withRouteSuspense(createElement(adminOverviewPageLoader)),
+          },
+          {
+            path: 'users',
+            element: withRouteSuspense(createElement(adminUsersPageLoader)),
+          },
+          {
+            path: 'doctors',
+            element: withRouteSuspense(createElement(adminDoctorsPageLoader)),
+          },
+          {
+            path: 'reviews',
+            element: withRouteSuspense(createElement(adminReviewsPageLoader)),
+          },
+          {
+            path: 'metrics',
+            element: withRouteSuspense(createElement(adminMetricsPageLoader)),
+          },
+          {
+            path: 'logs',
+            element: withRouteSuspense(createElement(adminLogsPageLoader)),
+          },
+          {
+            path: 'notifications',
+            element: withRouteSuspense(createElement(adminNotificationsPageLoader)),
+          },
+        ],
       },
       {
         path: 'dashboard/admin/accounts/:userId',
@@ -121,6 +179,14 @@ const router = createBrowserRouter([
       {
         path: 'appointment/:id',
         element: <AppointmentDetailPage />,
+      },
+      {
+        path: 'payment/success',
+        element: <PaymentSuccessPage />,
+      },
+      {
+        path: 'payment/cancel',
+        element: <PaymentCancelPage />,
       },
       {
         path: '*',

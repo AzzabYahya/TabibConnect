@@ -12,6 +12,9 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const cabinetRoutes = require('./routes/cabinetRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const { csrfErrorHandler } = require('./middlewares/csrfProtection');
 const errorHandler = require('./middlewares/errorHandler');
 const sanitizeInputs = require('./middlewares/sanitizeInputs');
@@ -50,8 +53,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/cabinets', cabinetRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.use('/api', healthRoutes);
 

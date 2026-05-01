@@ -19,6 +19,11 @@ Les fichiers docs redondants ont ete supprimes pour garder une base claire.
 - Dashboard patient (rendez-vous, suivi, notifications).
 - Dashboard medecin (agenda, demandes, disponibilites).
 - Dashboard admin (validation, moderation, operations).
+- Dashboards refondus: architecture contextuelle par role (sidebar admin, tabs medecin, grille patient).
+- Pagination serveur implementee sur les sections listes critiques (admin users/logs et vues associees).
+- Nouvelles routes admin documentees: `/api/admin/users`, `/api/admin/doctors`, `/api/admin/reviews`, `/api/admin/logs`, `/api/admin/metrics`, `/api/admin/notifications`.
+- Socket.IO temps reel: notifications (badge rouge) + rafraichissement dashboards.
+- Dashboard patient: endpoints pagines `/api/dashboard/patient/history` et `/api/dashboard/patient/notifications`.
 
 ## Stack technique
 

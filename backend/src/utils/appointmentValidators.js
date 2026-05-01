@@ -13,6 +13,27 @@ const createAppointmentValidator = [
     .toBoolean()
     .custom((value, { req }) => req.body.methodePaiement !== 'CASH' || value === true)
     .withMessage('Cash payment conditions must be accepted when paying by cash'),
+  body('cardPayment').optional().isObject(),
+  body('cardPayment.cardHolder')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 120 }),
+  body('cardPayment.cardNumber')
+    .optional()
+    .isString()
+    .matches(/^\d{16}$/),
+  body('cardPayment.expMonth')
+    .optional()
+    .isString()
+    .matches(/^(0[1-9]|1[0-2])$/),
+  body('cardPayment.expYear')
+    .optional()
+    .isString()
+    .matches(/^\d{2}$/),
+  body('cardPayment.cvc')
+    .optional()
+    .isString()
+    .matches(/^\d{3,4}$/),
   body('notes').optional().trim().isLength({ max: 2000 }).escape(),
   body('dateHeure').isISO8601(),
 ];

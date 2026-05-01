@@ -1,6 +1,7 @@
 const dashboardService = require('../services/dashboardService');
 const doctorDashboardService = require('../services/doctorDashboardService');
 const adminService = require('../services/adminService');
+const patientChangeRequestService = require('../services/patientChangeRequestService');
 
 const getPatientDashboard = async (req, res) => {
   const dashboard = await dashboardService.getPatientDashboard({ userId: req.user.id });
@@ -9,6 +10,71 @@ const getPatientDashboard = async (req, res) => {
     status: 'success',
     data: dashboard,
   });
+};
+
+const getPatientHistory = async (req, res) => {
+  const data = await dashboardService.getPatientHistory({
+    userId: req.user.id,
+    page: req.query.page,
+    limit: req.query.limit,
+    status: req.query.status,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const getPatientRecurringDoctors = async (req, res) => {
+  const data = await dashboardService.getPatientRecurringDoctors({ userId: req.user.id });
+  res.status(200).json({ status: 'success', data });
+};
+
+const getPatientNotifications = async (req, res) => {
+  const data = await dashboardService.getPatientNotifications({
+    userId: req.user.id,
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const markPatientNotificationsRead = async (req, res) => {
+  const data = await dashboardService.markPatientNotificationsRead({ userId: req.user.id });
+  res.status(200).json({ status: 'success', data });
+};
+
+const submitPatientChangeRequest = async (req, res) => {
+  const data = await patientChangeRequestService.submitPatientChangeRequest({ userId: req.user.id, payload: req.body });
+  res.status(201).json({ status: 'success', data });
+};
+
+const listMyPatientChangeRequests = async (req, res) => {
+  const data = await patientChangeRequestService.listMyPatientChangeRequests({ userId: req.user.id });
+  res.status(200).json({ status: 'success', data });
+};
+
+const listPendingPatientChangeRequests = async (req, res) => {
+  const data = await patientChangeRequestService.listPendingPatientChangeRequests({
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const approvePatientChangeRequest = async (req, res) => {
+  const data = await patientChangeRequestService.approvePatientChangeRequest({
+    requestId: req.params.requestId,
+    adminUserId: req.user.id,
+    reviewNote: req.body.reviewNote,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const rejectPatientChangeRequest = async (req, res) => {
+  const data = await patientChangeRequestService.rejectPatientChangeRequest({
+    requestId: req.params.requestId,
+    adminUserId: req.user.id,
+    reviewNote: req.body.reviewNote,
+  });
+  res.status(200).json({ status: 'success', data });
 };
 
 const getDoctorDashboard = async (req, res) => {
@@ -110,15 +176,116 @@ const createAccountByAdmin = async (req, res) => {
   });
 };
 
+const getAdminUsers = async (req, res) => {
+  const payload = await adminService.getAdminUsers({
+    page: req.query.page,
+    limit: req.query.limit,
+    role: req.query.role,
+    search: req.query.search,
+    city: req.query.city,
+    status: req.query.status,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getAdminLogs = async (req, res) => {
+  const payload = await adminService.getAdminLogs({
+    page: req.query.page,
+    limit: req.query.limit,
+    type: req.query.type,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getAdminMetrics = async (req, res) => {
+  const payload = await adminService.getAdminMetrics();
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getAdminDoctors = async (req, res) => {
+  const payload = await adminService.getAdminDoctors({
+    page: req.query.page,
+    limit: req.query.limit,
+    status: req.query.status,
+    search: req.query.search,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const rejectDoctor = async (req, res) => {
+  const payload = await adminService.rejectDoctor({
+    doctorId: req.params.doctorId,
+    reason: req.body.reason,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getAdminReviews = async (req, res) => {
+  const payload = await adminService.getAdminReviews({
+    page: req.query.page,
+    limit: req.query.limit,
+    status: req.query.status,
+    search: req.query.search,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const rejectReview = async (req, res) => {
+  const payload = await adminService.rejectReview({
+    reviewId: req.params.reviewId,
+    reason: req.body.reason,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getAdminNotifications = async (req, res) => {
+  const payload = await adminService.getAdminNotifications({
+    page: req.query.page,
+    limit: req.query.limit,
+    isRead: req.query.isRead,
+    search: req.query.search,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const markNotificationsRead = async (req, res) => {
+  const payload = await adminService.markNotificationsRead({ ids: req.body.ids });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const disableUser = async (req, res) => {
+  const payload = await adminService.disableUser({ userId: req.params.userId });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
 module.exports = {
   getAdminDashboard,
   getAdminAccountDetails,
   getDoctorDashboard,
   getPatientDashboard,
+  getPatientHistory,
+  getPatientRecurringDoctors,
+  getPatientNotifications,
+  markPatientNotificationsRead,
+  submitPatientChangeRequest,
+  listMyPatientChangeRequests,
+  listPendingPatientChangeRequests,
+  approvePatientChangeRequest,
+  rejectPatientChangeRequest,
   notifyAccount,
   approveDoctorChangeRequest,
   rejectDoctorChangeRequest,
   createAccountByAdmin,
   verifyDoctor,
   verifyReview,
+  getAdminUsers,
+  getAdminLogs,
+  getAdminMetrics,
+  getAdminDoctors,
+  rejectDoctor,
+  getAdminReviews,
+  rejectReview,
+  getAdminNotifications,
+  markNotificationsRead,
+  disableUser,
 };

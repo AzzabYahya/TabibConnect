@@ -70,6 +70,11 @@ const defaultBookingForm = {
   methodePaiement: 'CMI',
   acceptedGeneralTerms: false,
   acceptedCashPolicy: false,
+  cardHolder: '',
+  cardNumber: '',
+  expMonth: '',
+  expYear: '',
+  cvc: '',
 };
 
 const toSafeNumber = (value) => {
@@ -300,6 +305,21 @@ function DoctorProfilePage() {
       toast.error('Vous devez accepter la politique de paiement en espèces.');
       return;
     }
+    if (bookingForm.methodePaiement === 'CMI') {
+      const cardNumber = bookingForm.cardNumber.replace(/\s/g, '');
+      if (!bookingForm.cardHolder.trim() || cardNumber.length !== 16 || !/^\d{16}$/.test(cardNumber)) {
+        toast.error('Veuillez renseigner une carte valide (16 chiffres).');
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])$/.test(bookingForm.expMonth) || !/^\d{2}$/.test(bookingForm.expYear)) {
+        toast.error('Date d’expiration de la carte invalide.');
+        return;
+      }
+      if (!/^\d{3,4}$/.test(bookingForm.cvc)) {
+        toast.error('Code CVC invalide.');
+        return;
+      }
+    }
 
     try {
       setBookingSubmitting(true);
@@ -316,13 +336,27 @@ function DoctorProfilePage() {
         methodePaiement: bookingForm.methodePaiement,
         acceptedGeneralTerms: bookingForm.acceptedGeneralTerms,
         acceptedCashPolicy: bookingForm.methodePaiement === 'CASH' ? bookingForm.acceptedCashPolicy : false,
+        cardPayment:
+          bookingForm.methodePaiement === 'CMI'
+            ? {
+                cardHolder: bookingForm.cardHolder.trim(),
+                cardNumber: bookingForm.cardNumber.replace(/\s/g, ''),
+                expMonth: bookingForm.expMonth,
+                expYear: bookingForm.expYear,
+                cvc: bookingForm.cvc,
+              }
+            : undefined,
       });
 
       const createdAppointment = response.data?.data;
-      toast.success('Rendez-vous confirmé.');
+      toast.success('Rendez-vous créé.');
       setModalOpen(false);
       resetBookingForm();
 
+      if (createdAppointment?.paymentCheckoutUrl) {
+        window.location.assign(createdAppointment.paymentCheckoutUrl);
+        return;
+      }
       if (createdAppointment?.id) {
         navigate(`/appointment/${createdAppointment.id}`);
       }
@@ -751,16 +785,16 @@ function DoctorProfilePage() {
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Confirmation du rendez-vous">
         <div className="space-y-5">
           <div className="grid gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 md:grid-cols-2">
-            <p>
-              Médecin : <strong>{doctor.nomComplet || doctor.user?.email}</strong>
+            <p className="min-w-0 break-words">
+              Médecin : <strong className="break-all">{doctor.nomComplet || doctor.user?.email}</strong>
             </p>
-            <p>
-              Créneau : <strong>{selectedSlotDateLabel || 'Aucun créneau sélectionné'}</strong>
+            <p className="min-w-0 break-words">
+              Créneau : <strong className="break-words">{selectedSlotDateLabel || 'Aucun créneau sélectionné'}</strong>
             </p>
-            <p>
-              Cabinet: <strong>{selectedSlot?.cabinet?.nom || firstCabinet?.nom || 'N/A'}</strong>
+            <p className="min-w-0 break-words">
+              Cabinet: <strong className="break-words">{selectedSlot?.cabinet?.nom || firstCabinet?.nom || 'N/A'}</strong>
             </p>
-            <p>
+            <p className="min-w-0 break-words">
               Mode de consultation : <strong>Présentiel</strong>
             </p>
           </div>
@@ -792,7 +826,7 @@ function DoctorProfilePage() {
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
             <div>
               <p className="text-sm font-semibold text-slate-900">Choisissez votre moyen de paiement</p>
-              <p className="text-xs text-slate-500">Le choix est demandé avant confirmation du rendez-vous.</p>
+              <p className="text-xs text-slate-500">Carte bancaire réelle via passerelle sécurisée (chiffrée).</p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {paymentOptions.map((option) => (
@@ -827,6 +861,71 @@ function DoctorProfilePage() {
                 </label>
               ))}
             </div>
+            {bookingForm.methodePaiement === 'CMI' ? (
+              <div className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 md:grid-cols-2">
+                <Input
+                  id="card-holder"
+                  label="Titulaire de la carte"
+                  placeholder="AMINE FASSI"
+                  value={bookingForm.cardHolder}
+                  onChange={(event) => setBookingForm((current) => ({ ...current, cardHolder: event.target.value.toUpperCase() }))}
+                />
+                <Input
+                  id="card-number"
+                  label="Numéro de carte"
+                  placeholder="1234 5678 9012 3456"
+                  maxLength={19}
+                  value={bookingForm.cardNumber}
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/\D/g, '').slice(0, 16);
+                    const grouped = raw.replace(/(.{4})/g, '$1 ').trim();
+                    setBookingForm((current) => ({ ...current, cardNumber: grouped }));
+                  }}
+                />
+                <Input
+                  id="card-exp-month"
+                  label="Mois (MM)"
+                  placeholder="08"
+                  maxLength={2}
+                  value={bookingForm.expMonth}
+                  onChange={(event) =>
+                    setBookingForm((current) => ({
+                      ...current,
+                      expMonth: event.target.value.replace(/\D/g, '').slice(0, 2),
+                    }))
+                  }
+                />
+                <Input
+                  id="card-exp-year"
+                  label="Année (YY)"
+                  placeholder="27"
+                  maxLength={2}
+                  value={bookingForm.expYear}
+                  onChange={(event) =>
+                    setBookingForm((current) => ({
+                      ...current,
+                      expYear: event.target.value.replace(/\D/g, '').slice(0, 2),
+                    }))
+                  }
+                />
+                <Input
+                  id="card-cvc"
+                  label="CVC"
+                  placeholder="123"
+                  maxLength={4}
+                  value={bookingForm.cvc}
+                  onChange={(event) =>
+                    setBookingForm((current) => ({
+                      ...current,
+                      cvc: event.target.value.replace(/\D/g, '').slice(0, 4),
+                    }))
+                  }
+                />
+                <div className="rounded-xl bg-white/80 px-3 py-2 text-xs text-slate-600">
+                  Les données carte sont transmises vers la passerelle bancaire sécurisée.
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">

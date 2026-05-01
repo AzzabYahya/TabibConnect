@@ -19,11 +19,6 @@ import LanguageSwitcher from '../components/common/LanguageSwitcher';
 import { dashboardRouteByRole, getCurrentSession } from '../lib/auth';
 import { logoutCurrentUser } from '../lib/accountActions';
 
-const navItems = [
-  { to: '/', label: 'Accueil' },
-  { to: '/search', label: 'Recherche' },
-];
-
 const headerActionClassName =
   'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
 
@@ -35,12 +30,18 @@ function AppShell() {
   const dashboardPath = session.user?.role ? dashboardRouteByRole[session.user.role] : null;
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isSearchRoute = location.pathname.startsWith('/search');
+  const isDashboardRoute = location.pathname.startsWith('/dashboard/');
 
   useEffect(() => {
     const direction = i18n.language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
     document.documentElement.dir = direction;
   }, [i18n.language]);
+
+  const navItems = [
+    { to: '/', label: t('nav.home') },
+    { to: '/search', label: t('nav.search') },
+  ];
 
   const handleLogout = async () => {
     try {
@@ -89,41 +90,45 @@ function AppShell() {
               <>
                 <Link to="/connexion" className={`${headerActionClassName} border border-med-primary/30 bg-white/80 text-med-primary hover:bg-med-primary/10`}>
                   <LogIn size={16} />
-                  Connexion
+                  {t('nav.login')}
                 </Link>
                 <Link to="/inscription" className={`${headerActionClassName} bg-med-primary text-white shadow-lg shadow-med-primary/20 hover:-translate-y-0.5 hover:bg-med-primary/90`}>
                   <UserRoundPlus size={16} />
-                  Inscription
+                  {t('nav.register')}
                 </Link>
               </>
             ) : (
               <>
-                {dashboardPath ? (
+                {!isDashboardRoute && dashboardPath ? (
                   <Link to={dashboardPath} className={`${headerActionClassName} bg-med-primary text-white shadow-lg shadow-med-primary/20 hover:-translate-y-0.5 hover:bg-med-primary/90`}>
                     <LayoutDashboard size={16} />
-                    Mon espace
+                    {t('common.mySpace')}
                   </Link>
                 ) : null}
-                <Link to="/settings" className={`${headerActionClassName} border border-slate-300 bg-white/80 text-slate-700 hover:border-slate-400 hover:bg-slate-100`}>
-                  <Settings size={16} />
-                  Paramètres
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className={`${headerActionClassName} border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 disabled:cursor-wait disabled:opacity-70`}
-                >
-                  <LogOut size={16} />
-                  {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
-                </button>
+                {!isDashboardRoute ? (
+                  <>
+                    <Link to="/settings" className={`${headerActionClassName} border border-slate-300 bg-white/80 text-slate-700 hover:border-slate-400 hover:bg-slate-100`}>
+                      <Settings size={16} />
+                      {t('common.settings')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className={`${headerActionClassName} border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 disabled:cursor-wait disabled:opacity-70`}
+                    >
+                      <LogOut size={16} />
+                      {isLoggingOut ? t('common.logoutLoading') : t('common.logout')}
+                    </button>
+                  </>
+                ) : null}
               </>
             )}
           </div>
         </div>
       </header>
 
-      <main className={isSearchRoute ? 'relative z-10 flex-1 min-h-0 w-full px-0 py-0' : 'relative z-10 mx-auto w-full max-w-7xl flex-1 min-h-0 px-4 py-8 md:px-8 md:py-10'}>
+      <main className={isDashboardRoute ? 'relative z-10 flex-1 min-h-0 w-full px-0 py-0' : isSearchRoute ? 'relative z-10 flex-1 min-h-0 w-full px-0 py-0' : 'relative z-10 mx-auto w-full max-w-7xl flex-1 min-h-0 px-4 py-8 md:px-8 md:py-10'}>
         <Outlet />
       </main>
 
@@ -135,7 +140,7 @@ function AppShell() {
                 <Stethoscope className="h-6 w-6" />
                 <span className="text-lg font-bold tracking-tight">{t('appName')}</span>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-slate-300">La plateforme médicale de référence au Maroc.</p>
+              <p className="max-w-sm text-sm leading-6 text-slate-300">{t('appShell.platformTagline')}</p>
               <div className="flex items-center gap-3 text-slate-300">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/8">
                   <Camera size={16} />
@@ -150,7 +155,7 @@ function AppShell() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Navigation</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">{t('appShell.navigation')}</p>
               <div className="flex flex-col gap-2 text-sm text-slate-300">
                 {navItems.map((item) => (
                   <Link key={item.to} to={item.to} className="transition hover:text-white">
@@ -161,7 +166,7 @@ function AppShell() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Spécialités rapides</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">{t('appShell.quickSpecialties')}</p>
               <div className="flex flex-col gap-2 text-sm text-slate-300">
                 {['Cardiologie', 'Neurologie', 'Pédiatrie', 'Dermatologie', 'Orthopédie'].map((item) => (
                   <Link key={item} to={`/search?specialite=${encodeURIComponent(item)}`} className="transition hover:text-white">
@@ -172,24 +177,24 @@ function AppShell() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Contact & légal</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">{t('appShell.contactLegal')}</p>
               <div className="space-y-2 text-sm text-slate-300">
-                <p>Support 7j/7</p>
+                <p>{t('appShell.support')}</p>
                 <a href="mailto:contact@tabibconnect.ma" className="block transition hover:text-white">
                   contact@tabibconnect.ma
                 </a>
-                <p>Confidentialité médicale protégée</p>
-                <p>© 2026 TabibConnect. Morocco Health Tech.</p>
+                <p>{t('appShell.privacy')}</p>
+                <p>{t('appShell.rights')}</p>
               </div>
             </div>
           </div>
 
           <div className="mt-10 border-t border-white/10 pt-4 text-xs text-slate-400">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p>Mentions légales, conditions d’utilisation et politique de confidentialité.</p>
+              <p>{t('appShell.legalLine')}</p>
               <p className="inline-flex items-center gap-1">
                 <HeartPulse size={14} className="text-med-secondary" />
-                Soins numériques sécurisés
+                {t('appShell.secureCare')}
               </p>
             </div>
           </div>

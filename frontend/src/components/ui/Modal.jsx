@@ -35,11 +35,11 @@ function Modal({ isOpen, title, onClose, children }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="my-auto w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-white/40 bg-white p-6 shadow-2xl"
+            className="my-auto w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-white/40 bg-white p-4 shadow-2xl sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 className="min-w-0 break-words text-lg font-semibold text-slate-900">{title}</h3>
               <button
                 type="button"
                 onClick={onClose}

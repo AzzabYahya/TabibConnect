@@ -155,6 +155,49 @@ const cancelDoctorChangeRequest = async (req, res) => {
   });
 };
 
+const getDoctorAgenda = async (req, res) => {
+  const data = await doctorService.getDoctorAgenda({
+    userId: req.user.id,
+    weekStartISO: req.query.weekStart,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const listDoctorPatients = async (req, res) => {
+  const data = await doctorService.listDoctorPatients({
+    userId: req.user.id,
+    page: req.query.page,
+    limit: req.query.limit,
+    search: req.query.search,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const getDoctorReceivedReviews = async (req, res) => {
+  const data = await doctorService.getDoctorReceivedReviews({
+    userId: req.user.id,
+    page: req.query.page,
+    limit: req.query.limit,
+    sort: req.query.sort,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const getDoctorPatientHistory = async (req, res) => {
+  const data = await doctorService.getDoctorPatientHistory({
+    userId: req.user.id,
+    patientId: req.params.patientId,
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+  res.status(200).json({ status: 'success', data });
+};
+
+const getDoctorStats = async (req, res) => {
+  const data = await doctorService.getDoctorStats({ userId: req.user.id });
+  res.status(200).json({ status: 'success', data });
+};
+
 module.exports = {
   getDoctorAvailabilities,
   getDoctorProfile,
@@ -170,4 +213,9 @@ module.exports = {
   updateDoctorChangeRequest,
   cancelDoctorChangeRequest,
   updateDoctorProfile,
+  getDoctorAgenda,
+  listDoctorPatients,
+  getDoctorReceivedReviews,
+  getDoctorPatientHistory,
+  getDoctorStats,
 };

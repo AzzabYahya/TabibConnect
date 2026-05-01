@@ -201,6 +201,24 @@ function AppointmentDetailPage() {
                 </p>
               ) : null}
             </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Paiement</p>
+              {appointment.payment ? (
+                <div className="mt-1 space-y-1 text-sm text-slate-700">
+                  <p>
+                    Méthode: <span className="font-semibold">{appointment.payment.method === 'CMI' ? 'Carte bancaire' : appointment.payment.method}</span>
+                  </p>
+                  <p>
+                    Statut: <span className="font-semibold">{appointment.payment.status}</span>
+                  </p>
+                  <p>
+                    Référence: <span className="font-semibold">{appointment.payment.reference}</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-slate-700">Aucune transaction enregistrée.</p>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl bg-slate-50 p-4">

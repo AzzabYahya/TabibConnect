@@ -100,6 +100,9 @@ const env = {
     ['carte', 'identite', 'nationale', 'royaume', 'maroc', 'cin']
   ),
   cinVerificationOcrLang: process.env.CIN_VERIFICATION_OCR_LANG || 'fra+ara',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  stripeCurrency: process.env.STRIPE_CURRENCY || 'mad',
 };
 
 module.exports = env;
