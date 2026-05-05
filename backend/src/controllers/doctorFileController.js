@@ -20,6 +20,29 @@ const getDoctorProfilePhoto = async (req, res) => {
     }));
 
   if (!doc) {
+    // Serve gender-based default avatar for doctors without a photo
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { nomComplet: true, user: { select: { email: true } } },
+    });
+
+    const FEMALE_NAMES = /salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar|amina|nour|rania|sara|hind|zineb|loubna|ghita|imane|siham|naima|samira|asmae|karima|leila|lamia|houda|souad|wafa|ilham|nawal|meriem|bouchra|mariam/i;
+    const text = `${doctor?.nomComplet || ''} ${doctor?.user?.email || ''}`.toLowerCase();
+    const isFemale = FEMALE_NAMES.test(text);
+
+    const defaultPhoto = path.resolve(
+      __dirname,
+      '../../..',
+      'frontend/public/docs/screenshots',
+      isFemale ? 'medecin_femme.jpg' : 'medecin_homme.png'
+    );
+
+    if (fs.existsSync(defaultPhoto)) {
+      res.setHeader('Content-Type', isFemale ? 'image/jpeg' : 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      return res.sendFile(defaultPhoto);
+    }
+
     throw new HttpError(404, 'Profile photo not found');
   }
 

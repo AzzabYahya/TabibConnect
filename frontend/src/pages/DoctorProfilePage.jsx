@@ -172,7 +172,13 @@ function DoctorProfilePage() {
 
   const doctor = doctorQuery.data || {};
   const resolveImageUrl = (value) => {
-    if (!value) return undefined;
+    if (!value) {
+      const text = `${doctor?.nomComplet || ''} ${doctor?.user?.email || ''}`.toLowerCase();
+      if (/(salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar)/.test(text)) {
+        return '/assets/avatars/default_female.jpg';
+      }
+      return '/assets/avatars/default_male.png';
+    }
     if (/^https?:\/\//i.test(value)) return value;
     const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
     const path = value.startsWith('/') ? value.slice(1) : value;

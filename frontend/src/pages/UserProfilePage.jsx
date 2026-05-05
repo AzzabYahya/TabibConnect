@@ -127,8 +127,17 @@ function UserProfilePage() {
   const bannerUrl = isDoctor
     ? "https://images.unsplash.com/photo-1580281657702-257584239a55?auto=format&fit=crop&w=1800&q=80"
     : "https://images.unsplash.com/photo-1526256262350-7da7584cf5eb?auto=format&fit=crop&w=1800&q=80";
-  const resolveImageUrl = (value) => {
-    if (!value) return undefined;
+  const resolveImageUrl = (value, doctor) => {
+    if (!value) {
+      if (doctor) {
+        const text = `${doctor.nomComplet || ''} ${doctor.user?.email || ''}`.toLowerCase();
+        if (/(salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar)/.test(text)) {
+          return '/assets/avatars/default_female.jpg';
+        }
+        return '/assets/avatars/default_male.png';
+      }
+      return undefined;
+    }
     if (/^https?:\/\//i.test(value)) return value;
     const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
     const path = value.startsWith('/') ? value.slice(1) : value;
@@ -139,7 +148,7 @@ function UserProfilePage() {
     }
   };
   const avatarUrl = isDoctor
-    ? resolveImageUrl(data.doctor?.profilePhotoUrl)
+    ? resolveImageUrl(data.doctor?.profilePhotoUrl, data.doctor)
     : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=256&q=80';
 
   const consultedDoctors = Array.isArray(data.consultedDoctors) ? data.consultedDoctors : [];

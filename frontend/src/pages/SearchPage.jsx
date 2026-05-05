@@ -98,8 +98,15 @@ const inferTeleconsultation = (doctor) => {
   return Number(doctor.experience || 0) >= 8;
 };
 
-const resolveImageUrl = (value) => {
-  if (!value) return undefined;
+const resolveImageUrl = (value, doctor) => {
+  if (!value) {
+    // Return default avatar based on gender inference
+    const text = `${doctor?.nomComplet || ''} ${doctor?.user?.email || ''}`.toLowerCase();
+    if (/(salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar)/.test(text)) {
+      return '/assets/avatars/default_female.jpg';
+    }
+    return '/assets/avatars/default_male.png';
+  }
   if (/^https?:\/\//i.test(value)) return value;
   const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
   const path = value.startsWith('/') ? value.slice(1) : value;
@@ -550,7 +557,7 @@ function SearchPage() {
                       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A6B8A]/10 to-transparent" />
                       <Avatar
                         name={doctor.nomComplet}
-                        src={resolveImageUrl(doctor.profilePhotoUrl)}
+                        src={resolveImageUrl(doctor.profilePhotoUrl, doctor)}
                         size="xl"
                       />
                       {/* Rating badge */}

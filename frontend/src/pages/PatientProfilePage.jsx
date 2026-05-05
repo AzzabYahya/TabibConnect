@@ -11,8 +11,17 @@ import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 
-const resolveImageUrl = (value) => {
-  if (!value) return undefined;
+const resolveImageUrl = (value, profile) => {
+  if (!value) {
+    if (profile) {
+      const text = `${profile.nomComplet || ''} ${profile.email || ''}`.toLowerCase();
+      if (/(salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar)/.test(text)) {
+        return '/assets/avatars/default_female.jpg';
+      }
+      return '/assets/avatars/default_male.png';
+    }
+    return undefined;
+  }
   if (/^https?:\/\//i.test(value)) return value;
   const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
   const path = value.startsWith('/') ? value.slice(1) : value;
@@ -116,7 +125,7 @@ function PatientProfilePage() {
             </p>
             {profilePhotoUrl && (
               <div className="flex items-center gap-3">
-                <Avatar src={resolveImageUrl(profilePhotoUrl)} alt="Votre photo" size="lg" />
+                <Avatar src={resolveImageUrl(profilePhotoUrl, profile)} alt="Votre photo" size="lg" />
                 <p className="text-sm text-slate-600">Photo actuelle</p>
               </div>
             )}
