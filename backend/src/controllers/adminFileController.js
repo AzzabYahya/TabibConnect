@@ -18,8 +18,10 @@ const getDoctorDocument = async (req, res) => {
 
   const resolved = path.resolve(document.filePath);
   const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+  const normalizedResolved = path.normalize(resolved);
+  const normalizedRoot = path.normalize(uploadsRoot);
 
-  if (!resolved.startsWith(uploadsRoot)) {
+  if (!normalizedResolved.startsWith(normalizedRoot + path.sep)) {
     throw new HttpError(400, 'Invalid file path');
   }
 

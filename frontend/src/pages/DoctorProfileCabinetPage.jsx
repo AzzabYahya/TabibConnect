@@ -7,6 +7,19 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
+import Avatar from '../components/ui/Avatar';
+
+const resolveImageUrl = (value) => {
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
+  const path = value.startsWith('/') ? value.slice(1) : value;
+  try {
+    return new URL(path, base).toString();
+  } catch {
+    return undefined;
+  }
+};
 
 function DoctorProfileCabinetPage() {
   const [reason, setReason] = useState('');
@@ -121,6 +134,12 @@ function DoctorProfileCabinetPage() {
           <p className="text-xs text-slate-700">
             Obligatoire. Toute photo ajoutée ou modifiée doit être validée par l'administrateur.
           </p>
+          {managementQuery.data?.profilePhotoUrl && (
+            <div className="flex items-center gap-3">
+              <Avatar src={resolveImageUrl(managementQuery.data.profilePhotoUrl)} alt="Votre photo" size="lg" />
+              <p className="text-sm text-slate-600">Photo actuelle</p>
+            </div>
+          )}
           <input
             type="file"
             accept="image/*"

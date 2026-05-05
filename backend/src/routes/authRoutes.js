@@ -4,10 +4,7 @@ const authController = require('../controllers/authController');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const authRateLimiter = require('../middlewares/authRateLimiter');
-const {
-  doubleCsrfProtection,
-  issueCsrfToken,
-} = require('../middlewares/csrfProtection');
+const { issueCsrfToken } = require('../middlewares/csrfProtection');
 const uploadDoctorDocuments = require('../middlewares/uploadDoctorDocuments');
 const validateRequest = require('../middlewares/validateRequest');
 const {
@@ -29,7 +26,6 @@ router.get('/csrf-token', issueCsrfToken);
 router.post(
   '/register/patient',
   authRateLimiter,
-  doubleCsrfProtection,
   uploadDoctorDocuments.single('cinDocument'),
   registerPatientValidator,
   validateRequest,
@@ -39,7 +35,6 @@ router.post(
 router.post(
   '/register/doctor',
   authRateLimiter,
-  doubleCsrfProtection,
   uploadDoctorDocuments.fields([
     { name: 'documents', maxCount: 5 },
     { name: 'cinDocument', maxCount: 1 },
@@ -52,7 +47,6 @@ router.post(
 router.post(
   '/login',
   authRateLimiter,
-  doubleCsrfProtection,
   loginValidator,
   validateRequest,
   asyncHandler(authController.login)
@@ -61,14 +55,12 @@ router.post(
 router.post(
   '/logout',
   authRateLimiter,
-  doubleCsrfProtection,
   asyncHandler(authController.logout)
 );
 
 router.delete(
   '/me',
   authRateLimiter,
-  doubleCsrfProtection,
   authenticate,
   authorize(['PATIENT', 'DOCTOR', 'ADMIN']),
   deleteAccountValidator,
@@ -86,7 +78,6 @@ router.get(
 router.post(
   '/refresh-token',
   authRateLimiter,
-  doubleCsrfProtection,
   asyncHandler(authController.refreshToken)
 );
 
@@ -100,7 +91,6 @@ router.get(
 router.post(
   '/forgot-password',
   authRateLimiter,
-  doubleCsrfProtection,
   forgotPasswordValidator,
   validateRequest,
   asyncHandler(authController.forgotPassword)
@@ -109,7 +99,6 @@ router.post(
 router.post(
   '/reset-password/:token',
   authRateLimiter,
-  doubleCsrfProtection,
   resetPasswordValidator,
   validateRequest,
   asyncHandler(authController.resetPassword)
@@ -118,7 +107,6 @@ router.post(
 router.post(
   '/change-password',
   authenticate,
-  doubleCsrfProtection,
   changePasswordValidator,
   validateRequest,
   asyncHandler(authController.changePassword)

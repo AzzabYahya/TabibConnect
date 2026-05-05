@@ -40,18 +40,22 @@ const refreshAccessToken = async () => {
   return accessToken;
 };
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   const token = getStoredAccessToken();
-  const csrfToken = getStoredCsrfToken();
+  const methodsToProtect = ['post', 'put', 'patch', 'delete'];
+  const isMutation = config.method && methodsToProtect.includes(config.method.toLowerCase());
 
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  if (csrfToken && config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
-    config.headers = config.headers || {};
-    config.headers['x-csrf-token'] = csrfToken;
+  if (isMutation) {
+    const csrfToken = await ensureCsrfToken();
+    if (csrfToken) {
+      config.headers = config.headers || {};
+      config.headers['x-csrf-token'] = csrfToken;
+    }
   }
 
   return config;
@@ -65,8 +69,9 @@ api.interceptors.response.use(
     const requestUrl = String(originalRequest.url || '');
     const isAuthRefreshCall = requestUrl.includes('/auth/refresh-token');
     const isCsrfCall = requestUrl.includes('/auth/csrf-token');
+    const isLoginCall = requestUrl.includes('/auth/login');
 
-    if (status !== 401 || originalRequest._retry || isAuthRefreshCall || isCsrfCall) {
+    if (status !== 401 || originalRequest._retry || isAuthRefreshCall || isCsrfCall || isLoginCall) {
       return Promise.reject(error);
     }
 

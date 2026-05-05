@@ -2,6 +2,7 @@ const dashboardService = require('../services/dashboardService');
 const doctorDashboardService = require('../services/doctorDashboardService');
 const adminService = require('../services/adminService');
 const patientChangeRequestService = require('../services/patientChangeRequestService');
+const { logAudit } = require('../utils/auditLogger');
 
 const getPatientDashboard = async (req, res) => {
   const dashboard = await dashboardService.getPatientDashboard({ userId: req.user.id });
@@ -106,6 +107,13 @@ const getAdminAccountDetails = async (req, res) => {
 const verifyDoctor = async (req, res) => {
   const doctor = await adminService.verifyDoctor({ doctorId: req.params.doctorId });
 
+  await logAudit({
+    req,
+    action: 'DOCTOR_VERIFIED',
+    targetId: req.params.doctorId,
+    payload: { doctorName: doctor.nomComplet },
+  });
+
   res.status(200).json({
     status: 'success',
     message: 'Doctor verified successfully',
@@ -144,6 +152,14 @@ const approveDoctorChangeRequest = async (req, res) => {
     adminUserId: req.user.id,
     reviewNote: req.body.reviewNote,
   });
+
+  await logAudit({
+    req,
+    action: 'DOCTOR_CHANGE_APPROVED',
+    targetId: req.params.requestId,
+    payload: { doctorId: result.doctorId, type: result.type },
+  });
+
   res.status(200).json({
     status: 'success',
     message: 'Doctor change request approved',
@@ -229,6 +245,14 @@ const rejectDoctor = async (req, res) => {
     doctorId: req.params.doctorId,
     reason: req.body.reason,
   });
+
+  await logAudit({
+    req,
+    action: 'DOCTOR_REJECTED',
+    targetId: req.params.doctorId,
+    payload: { reason: req.body.reason },
+  });
+
   res.status(200).json({ status: 'success', data: payload });
 };
 
@@ -275,6 +299,13 @@ const markNotificationsRead = async (req, res) => {
 
 const disableUser = async (req, res) => {
   const payload = await adminService.disableUser({ userId: req.params.userId });
+
+  await logAudit({
+    req,
+    action: 'USER_DISABLED',
+    targetId: req.params.userId,
+  });
+
   res.status(200).json({ status: 'success', data: payload });
 };
 

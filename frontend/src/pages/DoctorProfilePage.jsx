@@ -174,8 +174,10 @@ function DoctorProfilePage() {
   const resolveImageUrl = (value) => {
     if (!value) return undefined;
     if (/^https?:\/\//i.test(value)) return value;
+    const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
+    const path = value.startsWith('/') ? value.slice(1) : value;
     try {
-      return new URL(value, api.defaults.baseURL).toString();
+      return new URL(path, base).toString();
     } catch {
       return undefined;
     }

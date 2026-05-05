@@ -5,6 +5,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const asyncHandler = require('../utils/asyncHandler');
 const validateRequest = require('../middlewares/validateRequest');
+const generalRateLimiter = require('../middlewares/generalRateLimiter');
 const {
   appointmentIdValidator,
   cancelAppointmentValidator,
@@ -17,6 +18,7 @@ const {
 const router = express.Router();
 
 router.use(authenticate);
+router.use(generalRateLimiter);
 
 router.post(
   '/',

@@ -67,7 +67,7 @@ const sendMail = async ({ to, subject, html }) => {
   });
 
   const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
+  if (previewUrl && env.nodeEnv === 'development') {
     // For local development without SMTP credentials.
     console.log(`Email preview available at: ${previewUrl}`);
   }

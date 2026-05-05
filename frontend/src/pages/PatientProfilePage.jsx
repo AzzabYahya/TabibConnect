@@ -11,6 +11,18 @@ import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 
+const resolveImageUrl = (value) => {
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value)) return value;
+  const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
+  const path = value.startsWith('/') ? value.slice(1) : value;
+  try {
+    return new URL(path, base).toString();
+  } catch {
+    return undefined;
+  }
+};
+
 function PatientProfilePage() {
   const navigate = useNavigate();
   const [profilePhotoFile, setProfilePhotoFile] = useState(null);
@@ -104,7 +116,7 @@ function PatientProfilePage() {
             </p>
             {profilePhotoUrl && (
               <div className="flex items-center gap-3">
-                <Avatar src={profilePhotoUrl} alt="Votre photo" size="lg" />
+                <Avatar src={resolveImageUrl(profilePhotoUrl)} alt="Votre photo" size="lg" />
                 <p className="text-sm text-slate-600">Photo actuelle</p>
               </div>
             )}

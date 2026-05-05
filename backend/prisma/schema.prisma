@@ -120,6 +120,7 @@ model User {
   notifications              Notification[]
   reviewedDoctorChangeRequests DoctorChangeRequest[] @relation("DoctorChangeRequestReviewer")
   reviewedPatientChangeRequests PatientChangeRequest[] @relation("PatientChangeRequestReviewer")
+  auditLogs                  AuditLog[]
 
   @@index([role])
   @@index([createdAt])
@@ -436,4 +437,21 @@ model Paiement {
   @@index([doctorId, createdAt])
   @@index([statut, createdAt])
   @@index([methode, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  targetId  String?
+  payload   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetId, createdAt])
 }

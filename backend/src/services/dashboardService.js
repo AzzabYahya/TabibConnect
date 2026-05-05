@@ -583,7 +583,7 @@ const getPatientProfileManagement = async ({ userId }) => {
     },
   });
 
-  const profilePhotoUrl = latestProfilePhoto ? `/api/patients/${patient.id}/profile-photo` : null;
+  const profilePhotoUrl = latestProfilePhoto ? `/patients/${patient.id}/profile-photo` : null;
 
   return {
     profile: patientData,

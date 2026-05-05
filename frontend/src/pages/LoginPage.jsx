@@ -119,9 +119,7 @@ function LoginPage() {
               id="login-email"
               type="email"
               label="Email"
-              placeholder="patient@tabibconnect.ma"
-              suggestions={['patient@tabibconnect.ma', 'admin@tabibconnect.ma', 'dr.amine.fassi@tabibconnect.ma']}
-              helperText="Exemples de comptes de démonstration disponibles dans la seed."
+              placeholder="votre.email@exemple.com"
               error={errors.email?.message}
               className="h-12 rounded-[10px] border-slate-300 focus:border-[#1A6B8A] focus:ring-[#1A6B8A]/30"
               {...register('email')}
@@ -131,7 +129,6 @@ function LoginPage() {
               type="password"
               label="Mot de passe"
               placeholder="********"
-              helperText="Mot de passe de démo: TabibConnect@2026"
               error={errors.password?.message}
               className="h-12 rounded-[10px] border-slate-300 focus:border-[#1A6B8A] focus:ring-[#1A6B8A]/30"
               {...register('password')}

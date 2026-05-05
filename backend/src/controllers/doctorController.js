@@ -19,7 +19,7 @@ const getDoctorProfile = async (req, res) => {
 };
 
 const searchDoctors = async (req, res) => {
-  const result = await doctorService.searchDoctors(req.query.q || '');
+  const result = await doctorService.searchDoctors(req.query);
 
   res.status(200).json({
     status: 'success',

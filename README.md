@@ -1,99 +1,129 @@
-# TabibConnect
+# TabibConnect — Master Documentation (Source de Vérité)
 
-Plateforme web de prise de rendez-vous medicaux (patient, medecin, admin), avec recherche de medecins, gestion de rendez-vous, tableaux de bord metier et validation admin.
+> **Plateforme web de prise de rendez-vous médicaux** (Patient, Médecin, Admin) — Maroc  
+> **Dernière mise à jour :** 5 mai 2026 (Audit & Hardening terminés)  
+> **Objectif :** Ce document centralise TOUTES les informations nécessaires pour une IA ou un développeur.
 
-## Documentation conservee
+---
 
-Les fichiers Markdown conserves dans le repo sont:
-- `README.md` (ce document)
-- `CONTRIBUTING.md` (regles de contribution)
-- `CHANGELOG.md` (historique des versions)
+{Mot de passe des compte : TabibConnect@2026}
 
-Les fichiers docs redondants ont ete supprimes pour garder une base claire.
+## 📷 Visuels de la Plateforme (UI/UX)
 
-## Fonctionnalites principales
+### 1. Recherche de Médecins (Mise à jour : Pagination de 8)
+![Recherche](docs/screenshots/search.png)
+*Interface de recherche avancée. Les résultats sont désormais paginés par listes de **8 docteurs par page** pour une meilleure lisibilité. Les photos de profil s'affichent correctement.*
 
-- Authentification securisee (JWT, refresh token, CSRF, RBAC).
-- Recherche medecins avec filtres (specialite, ville, disponibilite, assurance, etc.).
-- Profil medecin avec disponibilites et informations cabinet.
-- Dashboard patient (rendez-vous, suivi, notifications).
-- Dashboard medecin (agenda, demandes, disponibilites).
-- Dashboard admin (validation, moderation, operations).
-- Dashboards refondus: architecture contextuelle par role (sidebar admin, tabs medecin, grille patient).
-- Pagination serveur implementee sur les sections listes critiques (admin users/logs et vues associees).
-- Nouvelles routes admin documentees: `/api/admin/users`, `/api/admin/doctors`, `/api/admin/reviews`, `/api/admin/logs`, `/api/admin/metrics`, `/api/admin/notifications`.
-- Socket.IO temps reel: notifications (badge rouge) + rafraichissement dashboards.
-- Dashboard patient: endpoints pagines `/api/dashboard/patient/history` et `/api/dashboard/patient/notifications`.
+### 2. Dashboard Médecin
+![Doctor Dashboard](docs/screenshots/doctor-dashboard.png)
+*Le message administrateur concernant l'obligation de photo de profil est désormais une notification dynamique et dismissible.*
 
-## Stack technique
+### 3. Administration & Validation
+![Admin Dashboard](docs/screenshots/admin-dashboard.png)
+*Tableau de bord centralisé pour la validation des médecins et la gestion des comptes.*
 
-- Frontend: React + Vite + Tailwind + React Query
-- Backend: Node.js + Express
-- Database: PostgreSQL + Prisma
-- Carte: Leaflet
-- Tests: Jest/Supertest, Vitest, Playwright
+---
 
-## Demarrage rapide
+## 🏗️ Architecture Technique
 
-### 1) Backend
+### Stack Technologique
+| Couche | Technologie |
+| :--- | :--- |
+| **Frontend** | React 18, Vite, Tailwind CSS, React Query, React Router v6 |
+| **Backend** | Node.js, Express.js |
+| **Base de données** | PostgreSQL, Prisma ORM |
+| **Temps Réel** | Socket.IO (Notifications push & refresh dashboard) |
+| **Sécurité** | JWT (Access/Refresh), Global double CSRF, Helmet, Rate Limiting |
+| **Tests** | Jest, Supertest, Vitest, Playwright |
+| **Infrastructure** | Docker, Docker Compose, Nginx Reverse Proxy |
 
+### Structure des Dossiers
+- `backend/` : Logique serveur, Prisma schema, services métier, API.
+- `frontend/` : Application React, hooks personnalisés, composants UI.
+- `docs/screenshots/` : Captures d'écran de l'interface.
+- `uploads/` : Stockage des documents (CIN, photos) avec isolation sécurisée.
+
+---
+
+## 📊 Base de Données — Schéma Prisma
+
+### Modèles Principaux (15 modèles)
+- **User** : Compte central (email, phone, role, refresh token hash).
+- **Patient** : Profil médical, CIN, antécédents, historique RDV.
+- **Doctor** : INPE, spécialité, tarifs, bio, cabinets, documents.
+- **Cabinet** : Localisation physique (ville, quartier, GPS).
+- **Disponibilite** : Créneaux hebdomadaires gérés par le médecin.
+- **RendezVous** : Cœur de l'app (statut: EN_ATTENTE, CONFIRME, ANNULE, COMPLETE, NO_SHOW).
+- **AuditLog** : [NOUVEAU] Trace toutes les actions administratives sensibles.
+
+---
+
+## 🌐 Routes API & Frontend
+
+### Routes API Critiques (`/api/...`)
+- `/auth` : Inscription, Connexion, Logout, Refresh, CSRF-Token.
+- `/doctors` : Recherche (ILike/Full-text), Profil, Agenda, Disponibilités.
+- `/appointments` : Création (avec transaction DB), Confirmation, Annulation, Avis.
+- `/admin` : Gestion utilisateurs, Logs, Métriques, Validation documents.
+- `/dashboard` : Endpoints agrégés pour Patient, Docteur et Admin.
+
+### Navigation Frontend
+- `/search` : Recherche globale.
+- `/dashboard/patient` : Suivi et historique.
+- `/dashboard/doctor` : Gestion de l'agenda et des patients.
+- `/dashboard/admin` : Pilotage et modération.
+
+---
+
+## 🔐 Sécurité & Hardening (Audit 05/05/2026)
+
+L'audit technique du 5 mai a permis de corriger les vulnérabilités suivantes :
+1. **Global CSRF** : Protection appliquée à toutes les routes de mutation (POST/PUT/DELETE).
+2. **In-Memory CSRF** : Le jeton n'est plus dans `localStorage` mais en mémoire (protection XSS).
+3. **Path Traversal** : Serveur de fichiers sécurisé (interdiction de sortir du dossier `uploads`).
+4. **JWT Security** : Blocage du serveur en production si les secrets par défaut sont détectés.
+5. **Rate Limiting** : Protection contre le brute-force et le spam de réservations.
+6. **Audit Logging** : Traçabilité complète des actions des administrateurs.
+7. **Error Boundaries** : Gestion propre des crashs frontend pour éviter l'écran blanc.
+
+---
+
+## 🤖 Guide IA — Patterns & Logique Métier
+
+- **Services Layer** : Toute la logique métier est dans `backend/src/services/`. Les contrôleurs ne font que passer les données.
+- **Transactions** : La création de rendez-vous utilise des transactions Prisma pour garantir l'intégrité (RDV + Paiement + Notification).
+- **File Serving** : Les fichiers (photos, documents) ne sont JAMAIS servis en statique. Ils passent par un contrôleur qui vérifie les permissions et normalize les chemins.
+- **Real-time** : Socket.IO est utilisé pour mettre à jour les badges de notification en temps réel.
+
+---
+
+## ⚙️ Installation & Démarrage
+
+### Backend
 ```bash
 cd backend
-cp .env.example .env
+cp .env.example .env # Configurer DATABASE_URL, JWT_SECRET, CSRF_SECRET
 npm install
 npx prisma generate
 npx prisma db push
-npm run dev
+npm run dev # Port 4000
 ```
 
-### 2) Frontend
-
+### Frontend
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev # Port 5173
 ```
 
-### 3) URL locales
+---
 
-- Frontend: `http://localhost:5173`
-- API: `http://localhost:4000/api`
+## 📋 Historique & Contribution
+- **v1.0.2 (Mai 2026)** : Audit de sécurité complet, pagination de 8, hardening global.
+- **v1.0.1 (Avril 2026)** : Documentation et captures d'écran.
+- **v1.0.0 (Avril 2026)** : Lancement initial (MVP).
 
-## Variables d'environnement
-
-- Ne jamais versionner de fichier `.env`.
-- Utiliser uniquement:
-  - `backend/.env.example`
-  - `.env.production.example`
-- Remplacer toutes les valeurs `change_me_*` avant deploiment.
-
-## Captures d'ecran plateforme
-
-Les captures ci-dessous sont integrees dans le repository:
-
-#### Accueil
-
-![TabibConnect Home](docs/screenshots/home.png)
-
-#### Recherche medecins
-
-![TabibConnect Search](docs/screenshots/search.png)
-
-#### Connexion
-
-![TabibConnect Login](docs/screenshots/login.png)
-
-#### Inscription
-
-![TabibConnect Register](docs/screenshots/register.png)
-
-## Qualite et verification
-
-Commandes utiles:
-
-```bash
-cd backend && npm test
-cd frontend && npm run build
-cd frontend && npm run lint
-```
-
+**Règles de contribution :**
+- Secrets jamais commités.
+- Tests obligatoires pour tout changement métier.
+- Utiliser `resolveImageUrl` pour tout affichage d'image venant du backend.

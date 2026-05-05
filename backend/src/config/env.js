@@ -105,4 +105,22 @@ const env = {
   stripeCurrency: process.env.STRIPE_CURRENCY || 'mad',
 };
 
+
+if (env.nodeEnv === 'production') {
+  const defaults = [
+    'change_me_access_secret',
+    'change_me_refresh_secret',
+    'change_me_csrf_secret',
+  ];
+
+  if (defaults.includes(env.jwtAccessSecret)) {
+    throw new Error('JWT_ACCESS_SECRET must be set to a secure value in production');
+  }
+  if (defaults.includes(env.jwtRefreshSecret)) {
+    throw new Error('JWT_REFRESH_SECRET must be set to a secure value in production');
+  }
+  if (defaults.includes(env.csrfSecret)) {
+    throw new Error('CSRF_SECRET must be set to a secure value in production');
+  }
+}
 module.exports = env;

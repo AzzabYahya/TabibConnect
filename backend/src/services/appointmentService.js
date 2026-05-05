@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const env = require('../config/env');
 const HttpError = require('../utils/httpError');
@@ -68,7 +69,7 @@ const validateImmediateCardPayment = (cardPayment) => {
 };
 
 const generatePaymentReference = (method, suffix = '') => {
-  const segment = Math.random().toString(36).slice(2, 10).toUpperCase();
+  const segment = crypto.randomBytes(4).toString('hex').toUpperCase();
   const stamp = Date.now().toString().slice(-6);
   const safeSuffix = String(suffix || '').replace(/[^0-9A-Z]/gi, '').slice(-4);
   return `${method}-${stamp}-${segment}${safeSuffix ? `-${safeSuffix}` : ''}`;

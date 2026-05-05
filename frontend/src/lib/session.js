@@ -1,7 +1,7 @@
 const ACCESS_TOKEN_KEY = 'tabibconnect_access_token';
 const USER_KEY = 'tabibconnect_user';
-const CSRF_TOKEN_KEY = 'tabibconnect_csrf_token';
 const SESSION_CHANGE_EVENT = 'tabibconnect:session-changed';
+let inMemoryCsrfToken = null;
 
 const isBrowser = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
@@ -32,11 +32,7 @@ export const getStoredUser = () => {
 };
 
 export const getStoredCsrfToken = () => {
-  if (!isBrowser()) {
-    return null;
-  }
-
-  return window.localStorage.getItem(CSRF_TOKEN_KEY);
+  return inMemoryCsrfToken;
 };
 
 export const storeSession = ({ accessToken, user }) => {
@@ -56,11 +52,7 @@ export const storeSession = ({ accessToken, user }) => {
 };
 
 export const storeCsrfToken = (csrfToken) => {
-  if (!isBrowser() || !csrfToken) {
-    return;
-  }
-
-  window.localStorage.setItem(CSRF_TOKEN_KEY, csrfToken);
+  inMemoryCsrfToken = csrfToken;
 };
 
 export const clearSession = () => {
@@ -74,9 +66,5 @@ export const clearSession = () => {
 };
 
 export const clearCsrfToken = () => {
-  if (!isBrowser()) {
-    return;
-  }
-
-  window.localStorage.removeItem(CSRF_TOKEN_KEY);
+  inMemoryCsrfToken = null;
 };

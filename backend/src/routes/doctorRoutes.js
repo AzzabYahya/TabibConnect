@@ -20,8 +20,11 @@ const {
   doctorUpdateProfileValidator,
 } = require('../utils/doctorValidators');
 const validateRequest = require('../middlewares/validateRequest');
+const generalRateLimiter = require('../middlewares/generalRateLimiter');
 
 const router = express.Router();
+
+router.use(generalRateLimiter);
 
 router.get('/', doctorListValidator, validateRequest, asyncHandler(doctorController.listDoctors));
 

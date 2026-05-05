@@ -8,8 +8,11 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const asyncHandler = require('../utils/asyncHandler');
 const validateRequest = require('../middlewares/validateRequest');
+const generalRateLimiter = require('../middlewares/generalRateLimiter');
 
 const router = express.Router();
+
+router.use(generalRateLimiter);
 
 router.post('/me/profile-photo', authenticate, authorize(['PATIENT']), uploadDoctorDocuments.single('profilePhoto'), asyncHandler(patientController.uploadPatientProfilePhoto));
 

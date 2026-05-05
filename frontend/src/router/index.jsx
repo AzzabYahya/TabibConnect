@@ -16,6 +16,8 @@ import AdminDashboardLayout from '../layout/AdminDashboardLayout';
 import DoctorDashboardLayout from '../layout/DoctorDashboardLayout';
 import PatientDashboardLayout from '../layout/PatientDashboardLayout';
 import UserProfilePage from '../pages/UserProfilePage';
+import RouteErrorPage from '../pages/RouteErrorPage';
+import GeneralErrorBoundary from '../components/common/GeneralErrorBoundary';
 
 const searchPageLoader = lazy(() => import('../pages/SearchPage'));
 const dashboardPatientPageLoader = lazy(() => import('../pages/DashboardPatientPage'));
@@ -53,7 +55,12 @@ const withRouteSuspense = (element) => (
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <AppShell />,
+    element: (
+      <GeneralErrorBoundary>
+        <AppShell />
+      </GeneralErrorBoundary>
+    ),
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,

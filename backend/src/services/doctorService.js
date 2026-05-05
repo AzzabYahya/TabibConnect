@@ -144,8 +144,15 @@ const listDoctors = async (filters) => {
     };
   }
 
+  const page = Math.max(1, Number(filters.page || 1));
+  const limit = Math.max(1, Number(filters.limit || 8));
+  const skip = (page - 1) * limit;
+
+  const total = await prisma.doctor.count({ where });
   const doctors = await prisma.doctor.findMany({
     where,
+    skip,
+    take: limit,
     include: {
       user: {
         select: {
@@ -195,7 +202,7 @@ const listDoctors = async (filters) => {
     }
   }
 
-  const ratingSummary = await getDoctorRatingSummary(doctors.map((doctor) => doctor.id));
+  const ratingSummary = await getDoctorRatingSummary(doctorIds);
   let results = doctors.map((doctor) => {
     const enriched = enrichDoctor(doctor, ratingSummary);
     const profilePhoto = profilePhotoByDoctorId.get(doctor.id);
@@ -229,7 +236,15 @@ const listDoctors = async (filters) => {
       .map((entry) => entry.doctor);
   }
 
-  return results;
+  return {
+    items: results,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  };
 };
 
 const getDoctorProfile = async (doctorId) => {
@@ -293,11 +308,11 @@ const getDoctorProfile = async (doctorId) => {
     availabilityDays,
     profilePhoto: profilePhoto
       ? {
-          id: profilePhoto.id,
-          fileName: profilePhoto.fileName,
-          filePath: profilePhoto.filePath,
-          mimeType: profilePhoto.mimeType,
-        }
+        id: profilePhoto.id,
+        fileName: profilePhoto.fileName,
+        filePath: profilePhoto.filePath,
+        mimeType: profilePhoto.mimeType,
+      }
       : null,
     profilePhotoUrl: profilePhoto
       ? `/doctors/${doctorId}/profile-photo?v=${profilePhoto.id}`
@@ -305,18 +320,29 @@ const getDoctorProfile = async (doctorId) => {
   };
 };
 
-const searchDoctors = async (query) => {
+const searchDoctors = async (queryFilters) => {
+  const query = typeof queryFilters === 'string' ? queryFilters : (queryFilters.q || '');
   const normalizedQuery = query.trim();
+  const page = Math.max(1, Number(queryFilters.page || 1));
+  const limit = Math.max(1, Number(queryFilters.limit || 8));
+  const skip = (page - 1) * limit;
 
   if (!normalizedQuery) {
     return {
       query: normalizedQuery,
       suggestedSpecialties: [],
-      results: [],
+      items: [],
+      pagination: { page, limit, total: 0, pages: 0 },
     };
   }
 
   const suggestedSpecialties = suggestSpecialties(normalizedQuery);
+
+  // We need to get the total count for search as well. 
+  // Since search involves merging full-text, name fallback, and specialty suggestions,
+  // it's complex to get a precise 'total' without running the full merge logic.
+  // For now, we'll implement a simplified version or just return a fixed large number if results exist.
+  // Real implementation would ideally use a more unified SQL query.
 
   const fullTextResults = await prisma.$queryRaw`
     SELECT
@@ -356,7 +382,7 @@ const searchDoctors = async (query) => {
     ) @@ plainto_tsquery('simple', ${normalizedQuery})
     AND u."isVerified" = true
     ORDER BY rank DESC
-    LIMIT 25
+    LIMIT 100
   `;
 
   const mappedFullText = fullTextResults.map((row) => ({
@@ -372,6 +398,43 @@ const searchDoctors = async (query) => {
     rank: Number(row.rank),
   }));
 
+  // ILIKE fallback for name/firstname search when full-text gives few results
+  let nameFallback = [];
+  if (mappedFullText.length < 5) {
+    const queryPattern = `%${normalizedQuery}%`;
+    nameFallback = await prisma.$queryRaw`
+      SELECT
+        d.id,
+        d."nomComplet",
+        d.specialite,
+        d.bio,
+        d."tarifConsultation",
+        d.experience,
+        d."accepteAssurance",
+        d."languesParlees",
+        u.email
+      FROM "Doctor" d
+      INNER JOIN "User" u ON u.id = d."userId"
+      WHERE (d."nomComplet" ILIKE ${queryPattern} OR u.email ILIKE ${queryPattern})
+      AND u."isVerified" = true
+      ORDER BY d."nomComplet" ASC
+      LIMIT 100
+    `;
+  }
+
+  const mappedNameFallback = nameFallback.map((row) => ({
+    id: row.id,
+    nomComplet: row.nomComplet,
+    specialite: row.specialite,
+    bio: row.bio,
+    tarifConsultation: Number(row.tarifConsultation),
+    experience: row.experience,
+    accepteAssurance: row.accepteAssurance,
+    languesParlees: row.languesParlees,
+    email: row.email,
+    rank: 0,
+  }));
+
   let specialtyFallback = [];
 
   if (suggestedSpecialties.length) {
@@ -383,6 +446,7 @@ const searchDoctors = async (query) => {
             mode: 'insensitive',
           },
         })),
+        user: { isVerified: true },
       },
       include: {
         user: {
@@ -391,7 +455,7 @@ const searchDoctors = async (query) => {
           },
         },
       },
-      take: 25,
+      take: 100,
     });
   }
 
@@ -411,16 +475,65 @@ const searchDoctors = async (query) => {
 
   const merged = new Map();
 
-  [...mappedFullText, ...fallbackMapped].forEach((doctor) => {
+  [...mappedFullText, ...mappedNameFallback, ...fallbackMapped].forEach((doctor) => {
     if (!merged.has(doctor.id)) {
       merged.set(doctor.id, doctor);
     }
   });
 
+  const allMergedResults = Array.from(merged.values());
+  const total = allMergedResults.length;
+  
+  // Apply pagination to the merged list
+  const paginatedResults = allMergedResults.slice(skip, skip + limit);
+
+  // Enrich only the paginated results with profilePhotoUrl and ratings
+  const doctorIds = paginatedResults.map((doctor) => doctor.id);
+
+  const profilePhotos = await prisma.doctorDocument.findMany({
+    where: {
+      doctorId: { in: doctorIds },
+      mimeType: { startsWith: 'image/' },
+    },
+    select: {
+      id: true,
+      doctorId: true,
+      isProfilePhoto: true,
+      createdAt: true,
+    },
+    orderBy: [{ doctorId: 'asc' }, { isProfilePhoto: 'desc' }, { createdAt: 'desc' }],
+  });
+
+  const profilePhotoByDoctorId = new Map();
+  for (const doc of profilePhotos) {
+    if (!profilePhotoByDoctorId.has(doc.doctorId)) {
+      profilePhotoByDoctorId.set(doc.doctorId, doc);
+    }
+  }
+
+  const ratingSummary = await getDoctorRatingSummary(doctorIds);
+
+  const enrichedResults = paginatedResults.map((doctor) => {
+    const photo = profilePhotoByDoctorId.get(doctor.id);
+    const rating = ratingSummary.get(doctor.id) || { average: 0, count: 0 };
+    return {
+      ...doctor,
+      profilePhotoUrl: photo ? `/doctors/${doctor.id}/profile-photo?v=${photo.id}` : null,
+      ratingAverage: rating.average,
+      ratingCount: rating.count,
+    };
+  });
+
   return {
     query: normalizedQuery,
     suggestedSpecialties,
-    results: Array.from(merged.values()),
+    items: enrichedResults,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -610,6 +723,14 @@ const getDoctorProfileManagement = async ({ userId }) => {
     throw new HttpError(404, 'Doctor profile not found for this account');
   }
 
+  const latestProfilePhoto = await prisma.doctorDocument.findFirst({
+    where: { doctorId: doctor.id, isProfilePhoto: true },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+
+  const profilePhotoUrl = latestProfilePhoto ? `/doctors/${doctor.id}/profile-photo` : null;
+
   return {
     profile: {
       id: doctor.id,
@@ -630,6 +751,7 @@ const getDoctorProfileManagement = async ({ userId }) => {
       district: entry.cabinet.quartier,
     })),
     availabilities: doctor.disponibilites,
+    profilePhotoUrl,
   };
 };
 
@@ -883,14 +1005,14 @@ const getDoctorAgenda = async ({ userId, weekStartISO }) => {
       },
       cabinet: rdv.cabinet
         ? {
-            id: rdv.cabinet.id,
-            name: rdv.cabinet.nom,
-            city: rdv.cabinet.ville,
-            district: rdv.cabinet.quartier,
-            address: rdv.cabinet.adresse,
-            latitude: Number(rdv.cabinet.latitude),
-            longitude: Number(rdv.cabinet.longitude),
-          }
+          id: rdv.cabinet.id,
+          name: rdv.cabinet.nom,
+          city: rdv.cabinet.ville,
+          district: rdv.cabinet.quartier,
+          address: rdv.cabinet.adresse,
+          latitude: Number(rdv.cabinet.latitude),
+          longitude: Number(rdv.cabinet.longitude),
+        }
         : null,
     })),
   };

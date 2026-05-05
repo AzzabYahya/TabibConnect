@@ -35,7 +35,9 @@ const sendSms = async ({ to, body }) => {
 
   if (!client || !env.twilioFrom) {
     // Local fallback when no provider credentials are configured.
-    console.log(`[SMS MOCK] to=${to} body=${body}`);
+    if (env.nodeEnv === 'development') {
+      console.log(`[SMS MOCK] to=${to} body=${body}`);
+    }
     return { skipped: true, reason: 'SMS provider credentials not configured' };
   }
 
