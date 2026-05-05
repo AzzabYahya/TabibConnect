@@ -6,8 +6,6 @@
 
 ---
 
-{Mot de passe des compte : TabibConnect@2026}
-
 ## 📷 Visuels de la Plateforme (UI/UX)
 
 ### 1. Page d'Accueil & Navigation
@@ -18,15 +16,26 @@
 ![Search Results](frontend/public/docs/screenshots/search_results.png)
 *Le moteur de recherche affiche désormais une **pagination de 8 docteurs maximum par page**. Le nombre total de médecins trouvés est dynamiquement mis à jour pour garantir une transparence totale.*
 
-### 3. Connexion Sécurisée
+### 3. Carte interactive — Localisation des médecins
+![Search Map](frontend/public/docs/screenshots/search_map.png)
+*La carte interactive affiche les cabinets des médecins sur une carte OpenStreetMap avec des **marqueurs clusterisés**. Un clic sur un cluster zoome pour révéler les cabinets individuels avec les informations du praticien.*
+
+### 4. Connexion Sécurisée
 ![Login Page](frontend/public/docs/screenshots/login.png)
 *Interface de connexion optimisée avec gestion précise des erreurs (ex: "Identifiants incorrects" vs "Erreurs techniques").*
 
-### 4. Dashboard Médecin (Vue Agenda)
+#### 🔑 Comptes de Test
+| Rôle | Email | Mot de passe |
+| :--- | :--- | :--- |
+| **Admin** | `admin@tabibconnect.ma` | `TabibConnect@2026` |
+| **Docteur** | `dr.amine.fassi@tabibconnect.ma` | `TabibConnect@2026` |
+| **Patient** | `youssef.benali@tabibconnect.ma` | `TabibConnect@2026` |
+
+### 5. Dashboard Médecin (Vue Agenda)
 ![Doctor Dashboard](frontend/public/docs/screenshots/doctor_dashboard.png)
 *Espace de travail complet pour le praticien. Les icônes et menus sont rendus de manière fluide, et les alertes administratives sont clairement identifiées.*
 
-### 5. Dashboard Administration
+### 6. Dashboard Administration
 ![Admin Dashboard](frontend/public/docs/screenshots/admin_dashboard.png)
 *Tour de contrôle pour la validation des nouveaux inscrits et la surveillance de l'activité globale de la plateforme.*
 

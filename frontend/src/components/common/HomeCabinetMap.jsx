@@ -19,10 +19,15 @@ function HomeCabinetMap() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
     queryFn: async () => {
-      const response = await api.get('/doctors');
-      const doctors = response.data?.data;
+      const response = await api.get('/doctors', { params: { limit: 200 } });
+      const payload = response.data?.data;
 
-      return Array.isArray(doctors) ? doctors : [];
+      // Handle paginated response format: { items: [...], pagination: {...} }
+      if (payload && Array.isArray(payload.items)) {
+        return payload.items;
+      }
+
+      return Array.isArray(payload) ? payload : [];
     },
   });
 

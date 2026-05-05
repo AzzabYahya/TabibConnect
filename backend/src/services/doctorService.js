@@ -513,6 +513,31 @@ const searchDoctors = async (queryFilters) => {
 
   const ratingSummary = await getDoctorRatingSummary(doctorIds);
 
+  // Fetch cabinet GPS data for map markers
+  const doctorCabinetsData = await prisma.doctorCabinet.findMany({
+    where: { doctorId: { in: doctorIds } },
+    include: {
+      cabinet: {
+        select: {
+          id: true,
+          nom: true,
+          ville: true,
+          quartier: true,
+          latitude: true,
+          longitude: true,
+        },
+      },
+    },
+  });
+
+  const cabinetsByDoctorId = new Map();
+  for (const dc of doctorCabinetsData) {
+    if (!cabinetsByDoctorId.has(dc.doctorId)) {
+      cabinetsByDoctorId.set(dc.doctorId, []);
+    }
+    cabinetsByDoctorId.get(dc.doctorId).push(dc);
+  }
+
   const enrichedResults = paginatedResults.map((doctor) => {
     const photo = profilePhotoByDoctorId.get(doctor.id);
     const rating = ratingSummary.get(doctor.id) || { average: 0, count: 0 };
@@ -521,6 +546,7 @@ const searchDoctors = async (queryFilters) => {
       profilePhotoUrl: photo ? `/doctors/${doctor.id}/profile-photo?v=${photo.id}` : null,
       ratingAverage: rating.average,
       ratingCount: rating.count,
+      doctorCabinets: cabinetsByDoctorId.get(doctor.id) || [],
     };
   });
 

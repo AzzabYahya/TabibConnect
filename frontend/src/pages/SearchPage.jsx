@@ -2,10 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
-  CalendarClock,
-  ChevronDown,
   Filter,
-  HeartPulse,
   MapPinned,
   Search,
   ShieldCheck,
@@ -14,16 +11,13 @@ import {
   SlidersHorizontal,
   Video,
   X,
-  UserRound,
   Stethoscope,
-  MapPin,
   Clock,
 } from 'lucide-react';
 
 import AccessPromptModal from '../components/common/AccessPromptModal';
 import Skeleton from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
 import Avatar from '../components/ui/Avatar';
 import api from '../lib/api';
 import { getCurrentSession } from '../lib/auth';
@@ -123,7 +117,6 @@ function SearchPage() {
   const [filters, setFilters] = useState(() => createDefaultFilters(searchParams));
   const [sortBy, setSortBy] = useState('pertinence');
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState('grid');
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -225,6 +218,67 @@ function SearchPage() {
 
     return result;
   }, [doctors, filters, sortBy]);
+
+  // Build map marker points from doctor cabinet GPS data
+  const markerPoints = useMemo(() => {
+    const points = [];
+    const seenCabinets = new Set();
+
+    filteredDoctors.forEach((doctor) => {
+      const cabinets = doctor.doctorCabinets || [];
+      cabinets.forEach((dc) => {
+        const cab = dc.cabinet;
+        if (!cab || cab.latitude == null || cab.longitude == null) return;
+        const lat = Number(cab.latitude);
+        const lng = Number(cab.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const cabinetKey = cab.id;
+        if (seenCabinets.has(cabinetKey)) {
+          // Add doctor info to existing cabinet marker
+          const existing = points.find((p) => p.cabinetId === cabinetKey);
+          if (existing) {
+            existing.doctorNames.push(doctor.nomComplet || 'Dr.');
+            if (doctor.specialite && !existing.specialties.includes(doctor.specialite)) {
+              existing.specialties.push(doctor.specialite);
+            }
+          }
+          return;
+        }
+
+        seenCabinets.add(cabinetKey);
+
+        if (cabinets.length === 1) {
+          // Single cabinet — show individual doctor marker
+          points.push({
+            coords: [lat, lng],
+            doctorName: doctor.nomComplet || 'Dr.',
+            specialty: doctor.specialite || '',
+            tarifLabel: doctor.tarifConsultation
+              ? `${Number(doctor.tarifConsultation).toLocaleString('fr-FR')} MAD`
+              : 'Tarif non renseigné',
+            ville: cab.ville || '',
+            cabinetName: cab.nom || '',
+            cabinetId: cabinetKey,
+            profileHref: `/doctor/${doctor.id}`,
+            doctorId: doctor.id,
+          });
+        } else {
+          // Multi-doctor cabinet
+          points.push({
+            coords: [lat, lng],
+            doctorNames: [doctor.nomComplet || 'Dr.'],
+            specialties: doctor.specialite ? [doctor.specialite] : [],
+            ville: cab.ville || '',
+            cabinetName: cab.nom || '',
+            cabinetId: cabinetKey,
+          });
+        }
+      });
+    });
+
+    return points;
+  }, [filteredDoctors]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
@@ -592,6 +646,36 @@ function SearchPage() {
                 >
                   Suivant
                 </Button>
+              </div>
+            )}
+
+            {/* Map Section */}
+            {!loading && filteredDoctors.length > 0 && (
+              <div className="mt-10">
+                <div className="mb-4 flex items-center gap-2">
+                  <MapPinned size={18} className="text-[#1A6B8A]" />
+                  <h3 className="text-lg font-bold text-slate-900">Localisation des médecins</h3>
+                </div>
+                <Suspense
+                  fallback={
+                    <div className="flex h-[400px] items-center justify-center rounded-2xl border border-slate-200/60 bg-slate-50">
+                      <div className="text-center">
+                        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#1A6B8A] border-t-transparent" />
+                        <p className="text-sm text-slate-500">Chargement de la carte…</p>
+                      </div>
+                    </div>
+                  }
+                >
+                  <DoctorSearchMap
+                    markerPoints={markerPoints}
+                    className="h-[400px]"
+                    onMarkerProfileClick={(marker) => {
+                      if (marker.doctorId) {
+                        navigate(`/doctor/${marker.doctorId}`);
+                      }
+                    }}
+                  />
+                </Suspense>
               </div>
             )}
           </div>
