@@ -10,17 +10,25 @@
 
 ## 📷 Visuels de la Plateforme (UI/UX)
 
-### 1. Recherche de Médecins (Mise à jour : Pagination de 8)
-![Recherche](docs/screenshots/search.png)
-*Interface de recherche avancée. Les résultats sont désormais paginés par listes de **8 docteurs par page** pour une meilleure lisibilité. Les photos de profil s'affichent correctement.*
+### 1. Page d'Accueil & Navigation
+![Home Page](frontend/public/docs/screenshots/homepage.png)
+*Une interface moderne et épurée utilisant un design "Glassmorphism". La navigation est intuitive avec un accès rapide à la recherche et aux espaces dédiés.*
 
-### 2. Dashboard Médecin
-![Doctor Dashboard](docs/screenshots/doctor-dashboard.png)
-*Le message administrateur concernant l'obligation de photo de profil est désormais une notification dynamique et dismissible.*
+### 2. Recherche & Pagination intelligente
+![Search Results](frontend/public/docs/screenshots/search_results.png)
+*Le moteur de recherche affiche désormais une **pagination de 8 docteurs maximum par page**. Le nombre total de médecins trouvés est dynamiquement mis à jour pour garantir une transparence totale.*
 
-### 3. Administration & Validation
-![Admin Dashboard](docs/screenshots/admin-dashboard.png)
-*Tableau de bord centralisé pour la validation des médecins et la gestion des comptes.*
+### 3. Connexion Sécurisée
+![Login Page](frontend/public/docs/screenshots/login.png)
+*Interface de connexion optimisée avec gestion précise des erreurs (ex: "Identifiants incorrects" vs "Erreurs techniques").*
+
+### 4. Dashboard Médecin (Vue Agenda)
+![Doctor Dashboard](frontend/public/docs/screenshots/doctor_dashboard.png)
+*Espace de travail complet pour le praticien. Les icônes et menus sont rendus de manière fluide, et les alertes administratives sont clairement identifiées.*
+
+### 5. Dashboard Administration
+![Admin Dashboard](frontend/public/docs/screenshots/admin_dashboard.png)
+*Tour de contrôle pour la validation des nouveaux inscrits et la surveillance de l'activité globale de la plateforme.*
 
 ---
 
