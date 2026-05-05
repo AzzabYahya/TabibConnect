@@ -14,6 +14,7 @@ import { getCurrentSession } from '../lib/auth';
 import { logoutCurrentUser } from '../lib/accountActions';
 import api from '../lib/api';
 import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
+import { useNotificationSocket } from '../hooks/useNotificationSocket';
 import MedicalHeroAnimation from '../components/common/MedicalHeroAnimation';
 
 function DashboardShell({ subtitle, children }) {
@@ -46,6 +47,7 @@ function DashboardShell({ subtitle, children }) {
     const normalized = noEmail.replace(/^(dr\.?|docteur)\s+/i, '').trim();
     return normalized || 'Utilisateur';
   }, [profileQuery.data?.name, user]);
+  useNotificationSocket();
   const firstName = useMemo(() => resolvedName.split(/[.\s_-]+/)[0] || 'Utilisateur', [resolvedName]);
 
   const title = role === 'DOCTOR' ? t('dashboard.helloDoctor', { name: resolvedName }) : t('dashboard.helloUser', { name: firstName });
@@ -135,51 +137,75 @@ function DashboardShell({ subtitle, children }) {
       </div>
 
       <Modal isOpen={isNotifOpen} title={t('common.notifications')} onClose={() => setIsNotifOpen(false)}>
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button size="sm" onClick={() => markReadAll().catch(() => {})}>
-              {t('notifications.markAllRead', 'Tout marquer comme lu')}
-            </Button>
-            <p className="text-xs text-slate-500">
-              Non lues: <span className="font-semibold">{unreadQuery.data || 0}</span>
-            </p>
-          </div>
-
+        <div className="space-y-4">
           {notificationsQuery.isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-12" />
               ))}
             </div>
+          ) : (notificationsQuery.data?.items || []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-6">
+              <Bell className="h-8 w-8 text-slate-300" />
+              <p className="text-sm text-slate-600">Aucune notification</p>
+            </div>
           ) : (
-            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+            <div className="max-h-[65vh] space-y-2 overflow-y-auto">
               {(notificationsQuery.data?.items || []).map((n) => (
-                <Card key={n.id} className="bg-slate-50/90">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{n.type}</p>
-                    {!n.isRead ? <span className="h-2 w-2 rounded-full bg-red-500" /> : null}
+                <Card
+                  key={n.id}
+                  className={`p-3 ${!n.isRead ? 'border-l-2 border-l-blue-500 bg-blue-50' : 'bg-slate-50'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{n.type}</p>
+                        {!n.isRead && <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                      </div>
+                      <p className="mt-1 text-sm text-slate-700">{n.message}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {new Date(n.createdAt).toLocaleDateString('fr-MA', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-slate-700">{n.message}</p>
-                  <p className="text-xs text-slate-500">{new Date(n.createdAt).toLocaleString('fr-MA')}</p>
                 </Card>
               ))}
-              {!(notificationsQuery.data?.items || []).length ? (
-                <p className="text-sm text-slate-600">Aucune notification.</p>
-              ) : null}
             </div>
           )}
 
-          <div className="flex items-center justify-center gap-2">
-            <Button variant="outline" size="sm" disabled={!notificationsQuery.data?.pagination?.hasPrevPage} onClick={() => setNotifPage((p) => Math.max(1, p - 1))}>
-              ←
-            </Button>
-            <span className="text-sm">
-              {notificationsQuery.data?.pagination?.page || 1} / {notificationsQuery.data?.pagination?.totalPages || 1}
-            </span>
-            <Button variant="outline" size="sm" disabled={!notificationsQuery.data?.pagination?.hasNextPage} onClick={() => setNotifPage((p) => p + 1)}>
-              →
-            </Button>
+          <div className="border-t border-slate-200 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={notificationsQuery.isLoading || !notificationsQuery.data?.pagination?.hasPrevPage}
+                onClick={() => setNotifPage((p) => Math.max(1, p - 1))}
+              >
+                ← Précédent
+              </Button>
+              <span className="text-xs text-slate-600">
+                Page {notificationsQuery.data?.pagination?.page || 1} / {notificationsQuery.data?.pagination?.totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={notificationsQuery.isLoading || !notificationsQuery.data?.pagination?.hasNextPage}
+                onClick={() => setNotifPage((p) => p + 1)}
+              >
+                Suivant →
+              </Button>
+            </div>
           </div>
+
+          <Button onClick={() => markReadAll().catch(() => {})} className="w-full">
+            {t('notifications.markAllRead', 'Tout marquer comme lu')}
+          </Button>
         </div>
       </Modal>
     </div>

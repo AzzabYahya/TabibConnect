@@ -29,6 +29,7 @@ function DoctorProfileCabinetPage() {
     languesParlees: '',
     diplomes: '',
   });
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
 
   const managementQuery = useQuery({
     queryKey: ['doctor-profile-management'],
@@ -90,6 +91,20 @@ function DoctorProfileCabinetPage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Envoi localisation impossible.'),
   });
 
+  const profilePhotoMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append('profilePhoto', profilePhotoFile);
+      return api.post('/doctors/me/profile-photo', formData);
+    },
+    onSuccess: async () => {
+      toast.success('Photo envoyée. Validation admin en attente.');
+      setProfilePhotoFile(null);
+      await managementQuery.refetch();
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || 'Upload photo impossible.'),
+  });
+
   if (managementQuery.isLoading) {
     return <Skeleton className="h-80" />;
   }
@@ -101,6 +116,24 @@ function DoctorProfileCabinetPage() {
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="space-y-3">
         <p className="text-sm font-semibold text-slate-900">Profil (via demande admin)</p>
+        <Card className="space-y-2 border-cyan-200 bg-cyan-50/70">
+          <p className="text-sm font-semibold text-slate-900">Photo de profil médecin</p>
+          <p className="text-xs text-slate-700">
+            Obligatoire. Toute photo ajoutée ou modifiée doit être validée par l'administrateur.
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            onChange={(event) => setProfilePhotoFile(event.target.files?.[0] || null)}
+          />
+          <Button
+            onClick={() => profilePhotoMutation.mutate()}
+            disabled={profilePhotoMutation.isPending || !profilePhotoFile}
+          >
+            {profilePhotoMutation.isPending ? 'Envoi...' : 'Ajouter / Modifier ma photo'}
+          </Button>
+        </Card>
         <div className="grid gap-2 md:grid-cols-2">
           <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Nom complet" defaultValue={profile.nomComplet || ''} onChange={(e) => setForm((c) => ({ ...c, nomComplet: e.target.value }))} />
           <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Spécialité" defaultValue={profile.specialite || ''} onChange={(e) => setForm((c) => ({ ...c, specialite: e.target.value }))} />

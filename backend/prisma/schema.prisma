@@ -82,6 +82,7 @@ enum StatutPaiement {
 
 enum DoctorChangeRequestType {
   PROFILE_UPDATE
+  PROFILE_PHOTO_UPDATE
   LOCATION_CREATE
   LOCATION_UPDATE
 }
@@ -155,6 +156,7 @@ model Patient {
   avis            Avis[]
   doctorNotes     DoctorPatientNote[]
   changeRequests  PatientChangeRequest[]
+  patientDocuments PatientDocument[]
 
   @@index([ville])
   @@index([sexe])
@@ -247,10 +249,27 @@ model DoctorDocument {
   filePath  String
   mimeType  String
   size      Int
+  isProfilePhoto Boolean @default(false)
   createdAt DateTime @default(now())
   doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@index([doctorId])
+  @@index([doctorId, isProfilePhoto])
+}
+
+model PatientDocument {
+  id        String   @id @default(cuid())
+  patientId String
+  fileName  String
+  filePath  String
+  mimeType  String
+  size      Int
+  isProfilePhoto Boolean @default(false)
+  createdAt DateTime @default(now())
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([patientId, isProfilePhoto])
 }
 
 model Cabinet {

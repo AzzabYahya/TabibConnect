@@ -33,6 +33,7 @@ import api from '../lib/api';
 import { formatSpecialtyLabel } from '../lib/frenchText';
 import { MOROCCO_CITY_SELECT_OPTIONS } from '../lib/moroccoCities';
 import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
+import { useNotificationSocket } from '../hooks/useNotificationSocket';
 
 const MotionDiv = motion.div;
 
@@ -167,6 +168,7 @@ const fallbackDoctorDashboard = {
 
 function DashboardDoctorPage() {
   const navigate = useNavigate();
+  useNotificationSocket();
   const [patientSearch, setPatientSearch] = useState('');
   const [patientSort, setPatientSort] = useState('recent');
   const [profileForm, setProfileForm] = useState({

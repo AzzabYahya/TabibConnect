@@ -4,10 +4,8 @@ import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
 import {
   CalendarClock,
   CalendarPlus,
-  CalendarDays,
   CheckCircle2,
   Clock3,
-  AlertTriangle,
   Languages,
   MapPin,
   Navigation,
@@ -17,7 +15,7 @@ import {
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
@@ -34,13 +32,6 @@ import { formatSpecialtyLabel } from '../lib/frenchText';
 
 const MotionDiv = motion.div;
 const defaultCenter = [31.7917, -7.0926];
-
-const tabs = [
-  { id: 'about', label: 'À propos' },
-  { id: 'availabilities', label: 'Disponibilités' },
-  { id: 'reviews', label: 'Avis' },
-  { id: 'location', label: 'Localisation' },
-];
 
 const bookingReasonSuggestions = [
   'Contrôle annuel',
@@ -122,8 +113,6 @@ function DoctorProfilePage() {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(() => (searchParams.get('tab') === 'availabilities' ? 'availabilities' : 'about'));
   const [selectedDate, setSelectedDate] = useState(() => toLocalISODate(new Date()));
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -182,6 +171,15 @@ function DoctorProfilePage() {
   }, [availabilitiesQuery.data]);
 
   const doctor = doctorQuery.data || {};
+  const resolveImageUrl = (value) => {
+    if (!value) return undefined;
+    if (/^https?:\/\//i.test(value)) return value;
+    try {
+      return new URL(value, api.defaults.baseURL).toString();
+    } catch {
+      return undefined;
+    }
+  };
   const ratingAverage = new Intl.NumberFormat('fr-MA', {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
@@ -200,8 +198,6 @@ function DoctorProfilePage() {
       }).format(calendarMonthDate),
     [calendarMonthDate]
   );
-  const selectedDateWeekday = weekdayEnumByIndex[parseLocalISODate(selectedDate).getDay()];
-  const selectedDateIsAvailable = activeAvailabilityDays.has(selectedDateWeekday);
   const calendarDays = useMemo(() => {
     const gridStart = getCalendarGridStart(calendarMonthDate);
     const todayISO = toLocalISODate(new Date());
@@ -273,7 +269,6 @@ function DoctorProfilePage() {
   const handleOpenBooking = () => {
     if (!selectedSlot) {
       toast.error('Sélectionnez un créneau avant de continuer.');
-      setActiveTab('availabilities');
       return;
     }
 
@@ -377,16 +372,113 @@ function DoctorProfilePage() {
         <Card className="relative overflow-hidden space-y-5 rounded-[28px] border-med-primary/10 bg-white/95 p-6 shadow-xl shadow-med-primary/10">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-med-primary via-med-secondary to-med-accent" />
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-med-primary/10 blur-3xl" />
-          <div className="flex flex-wrap items-center gap-4">
-            <Avatar
-              size="lg"
-              name={doctor.nomComplet || doctor.user?.email || 'Doctor'}
-              alt={doctor.nomComplet || doctor.user?.email}
-            />
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{doctor.nomComplet || doctor.user?.email}</h1>
-              <p className="text-slate-600">{formatSpecialtyLabel(doctor.specialite)}</p>
+          <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+            <div className="space-y-4">
+              <div className="flex min-h-[360px] items-center justify-center rounded-3xl border border-med-primary/20 bg-gradient-to-br from-cyan-50 via-white to-slate-100">
+                <Avatar
+                  size="2xl"
+                  src={resolveImageUrl(doctor.profilePhotoUrl)}
+                  name={doctor.nomComplet || doctor.user?.email || 'Doctor'}
+                  alt={doctor.nomComplet || doctor.user?.email}
+                />
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">{doctor.nomComplet || doctor.user?.email}</h1>
+                <p className="text-slate-600">{formatSpecialtyLabel(doctor.specialite)}</p>
+              </div>
             </div>
+
+            <Card className="space-y-3 border-med-primary/20 bg-slate-50/80" id="doctor-availabilities-section">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold capitalize text-slate-900">{calendarMonthLabel}</p>
+                <p className="text-xs text-slate-500">{activeAvailabilityDays.size} jours actifs</p>
+              </div>
+              <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">
+                {weekdayLabels.map((label) => (
+                  <span key={`compact-${label}`}>{label}</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1.5">
+                {calendarDays.map((day) => (
+                  <button
+                    key={`compact-${day.isoDate}`}
+                    type="button"
+                    disabled={!day.isAvailable}
+                    onClick={() => {
+                      if (!day.isAvailable) return;
+                      setSelectedDate(day.isoDate);
+                      setSelectedSlot(null);
+                    }}
+                    className={`rounded-xl border p-1 text-xs font-semibold transition ${
+                      day.isSelected
+                        ? 'border-med-primary bg-med-primary text-white'
+                        : day.isAvailable
+                          ? 'border-med-secondary/30 bg-white text-slate-800 hover:border-med-secondary/50'
+                          : 'border-slate-200 bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    {day.dayNumber}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="selected-date" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Date sélectionnée
+                </label>
+                <input
+                  id="selected-date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => {
+                    setSelectedDate(event.target.value);
+                    setSelectedSlot(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800"
+                />
+              </div>
+
+              {availabilitiesQuery.isLoading ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Skeleton className="h-12" />
+                  <Skeleton className="h-12" />
+                </div>
+              ) : null}
+
+              {!availabilitiesQuery.isLoading && slots.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
+                  Aucun créneau disponible pour cette date.
+                </div>
+              ) : null}
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {slots.map((slot) => (
+                  <button
+                    key={slot.start}
+                    type="button"
+                    onClick={() => setSelectedSlot(slot)}
+                    className={`rounded-xl border px-3 py-2 text-start text-sm transition ${
+                      selectedSlot?.start === slot.start
+                        ? 'border-med-primary bg-med-primary/10 text-med-primary'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-med-primary/50'
+                    }`}
+                  >
+                    <p className="font-semibold">
+                      {new Date(slot.start).toLocaleTimeString('fr-MA', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      })}
+                    </p>
+                    <p className="text-xs text-slate-500">{slot.cabinet?.nom || 'Cabinet'}</p>
+                  </button>
+                ))}
+              </div>
+
+              <Button onClick={handleOpenBooking} className="w-full gap-2" disabled={!selectedSlot}>
+                <CalendarPlus size={16} /> Confirmer ce créneau
+              </Button>
+            </Card>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
@@ -449,45 +541,18 @@ function DoctorProfilePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              onClick={() => {
-                handleOpenBooking();
-              }}
-              className="gap-2"
-            >
-              <CalendarPlus size={16} /> Prendre RDV
-            </Button>
-            <Button
-              variant="outline"
-              className="shadow-sm"
-              onClick={() => setActiveTab('availabilities')}
-            >
-              Voir disponibilités
-            </Button>
+          <div className="text-xs text-slate-500">
+            Sélectionnez un jour puis un créneau, le bouton de réservation est affiché juste sous le calendrier.
           </div>
         </Card>
       </MotionDiv>
 
       <Card className="space-y-4">
-        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                activeTab === tab.id
-                  ? 'bg-med-primary text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="rounded-2xl border border-med-primary/15 bg-med-primary/5 p-3 text-sm text-slate-700">
+          Toutes les informations du médecin sont affichées sur une seule page pour faciliter la comparaison et la réservation.
         </div>
 
-        {activeTab === 'about' ? (
+        <section className="space-y-4">
           <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
             <p className="text-slate-700">
               {doctor.bio || 'Ce médecin a un profil en cours d’enrichissement.'}
@@ -521,176 +586,11 @@ function DoctorProfilePage() {
               </Card>
             </div>
           </MotionDiv>
-        ) : null}
+        </section>
 
-        {activeTab === 'availabilities' ? (
-          <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-            <Card className="space-y-4 border-med-primary/10 bg-gradient-to-br from-white via-white to-slate-50">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h3 className="inline-flex items-center gap-2 text-lg font-semibold text-slate-900">
-                    <CalendarDays size={18} className="text-med-primary" /> Aperçu du calendrier
-                  </h3>
-                  <p className="max-w-2xl text-sm text-slate-600">
-                    Les jours en vert correspondent aux jours où ce médecin publie au moins un créneau.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-med-secondary/15 px-3 py-1.5 text-emerald-800">
-                    <span className="h-2.5 w-2.5 rounded-full bg-med-secondary" /> Disponible
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">
-                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300" /> Non actif
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-med-primary/10 px-3 py-1.5 text-med-primary">
-                    <span className="h-2.5 w-2.5 rounded-full bg-med-primary" /> Sélectionné
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold capitalize text-slate-900">{calendarMonthLabel}</p>
-                <p className="text-xs text-slate-500">
-                  {activeAvailabilityDays.size
-                    ? `${activeAvailabilityDays.size} jour(s) actifs par semaine`
-                    : 'Planning récurrent non publié'}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                {weekdayLabels.map((label) => (
-                  <span key={label}>{label}</span>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-2">
-                {calendarDays.map((day) => (
-                  <button
-                    key={day.isoDate}
-                    type="button"
-                    disabled={!day.isAvailable}
-                    title={day.isAvailable ? 'Jour actif' : 'Jour sans disponibilité'}
-                    onClick={() => {
-                      if (!day.isAvailable) {
-                        return;
-                      }
-
-                      setSelectedDate(day.isoDate);
-                      setSelectedSlot(null);
-                    }}
-                    className={`flex min-h-[74px] flex-col justify-between rounded-2xl border p-2 text-left transition ${
-                      day.isSelected
-                        ? 'border-med-primary bg-med-primary text-white shadow-lg shadow-med-primary/20'
-                        : day.isAvailable
-                          ? day.isCurrentMonth
-                            ? 'border-med-secondary/30 bg-med-secondary/10 text-slate-900 hover:border-med-secondary/50 hover:bg-med-secondary/15'
-                            : 'border-med-secondary/20 bg-med-secondary/5 text-slate-700 hover:border-med-secondary/40'
-                          : day.isCurrentMonth
-                            ? 'border-slate-200 bg-slate-100 text-slate-400'
-                            : 'border-slate-200/70 bg-slate-50 text-slate-300'
-                    } ${!day.isAvailable ? 'cursor-not-allowed opacity-60' : ''}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-xs font-semibold uppercase ${day.isSelected ? 'text-white/80' : day.isAvailable ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        {day.weekdayLabel}
-                      </span>
-                      {day.isToday ? (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${day.isSelected ? 'bg-white/20 text-white' : 'bg-white text-med-primary'}`}>
-                          Aujourd’hui
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="flex items-end justify-between gap-2">
-                      <span className="text-base font-bold">{day.dayNumber}</span>
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          day.isSelected
-                            ? 'bg-white'
-                            : day.isAvailable
-                              ? 'bg-med-secondary'
-                              : 'bg-slate-300'
-                        }`}
-                      />
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {!activeAvailabilityDays.size ? (
-                <p className="inline-flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  Aucun jour actif n’a encore été publié pour ce médecin.
-                </p>
-              ) : null}
-
-              {selectedDate && !selectedDateIsAvailable ? (
-                <p className="inline-flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  Le jour sélectionné est habituellement inactif. Choisissez un jour en vert pour voir des créneaux.
-                </p>
-              ) : null}
-            </Card>
-
-            <div className="max-w-sm space-y-1.5">
-              <label htmlFor="selected-date" className="text-sm font-medium text-slate-700">
-                Date
-              </label>
-              <input
-                id="selected-date"
-                type="date"
-                value={selectedDate}
-                onChange={(event) => {
-                  setSelectedDate(event.target.value);
-                  setSelectedSlot(null);
-                }}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800"
-              />
-            </div>
-
-            {availabilitiesQuery.isLoading ? (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-              </div>
-            ) : null}
-
-            {!availabilitiesQuery.isLoading && slots.length === 0 ? (
-              <Card className="bg-slate-50">
-                <p className="text-sm text-slate-600">Aucun créneau disponible pour cette date.</p>
-              </Card>
-            ) : null}
-
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {slots.map((slot) => (
-                <button
-                  key={slot.start}
-                  type="button"
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`rounded-xl border px-3 py-2 text-start text-sm transition ${
-                    selectedSlot?.start === slot.start
-                      ? 'border-med-primary bg-med-primary/10 text-med-primary'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-med-primary/50'
-                  }`}
-                >
-                  <p className="font-semibold">
-                    {new Date(slot.start).toLocaleTimeString('fr-MA', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false,
-                    })}
-                  </p>
-                  <p className="text-xs text-slate-500">{slot.cabinet?.nom || 'Cabinet'}</p>
-                </button>
-              ))}
-            </div>
-          </MotionDiv>
-        ) : null}
-
-        {activeTab === 'reviews' ? (
+        <section className="space-y-4">
           <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            <h3 className="text-lg font-semibold text-slate-900">Avis</h3>
             {reviewsQuery.isLoading ? (
               <>
                 <Skeleton className="h-20" />
@@ -704,23 +604,25 @@ function DoctorProfilePage() {
               </Card>
             ) : null}
 
-            {(reviewsQuery.data?.reviews || []).map((review) => (
-              <Card key={review.id} className="space-y-2 bg-slate-50">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {review.patient?.user?.email || 'Patient'}
-                  </p>
-                  <p className="inline-flex items-center gap-1 text-sm text-amber-600">
-                    <Star size={14} /> {review.note}/5
-                  </p>
-                </div>
-                <p className="text-sm text-slate-600">{review.commentaire || 'Aucun commentaire.'}</p>
-              </Card>
-            ))}
+            <div className={`gap-3 ${(reviewsQuery.data?.reviews || []).length > 1 ? 'flex overflow-x-auto pb-2' : 'space-y-3'}`}>
+              {(reviewsQuery.data?.reviews || []).map((review) => (
+                <Card key={review.id} className={`space-y-2 bg-slate-50 ${(reviewsQuery.data?.reviews || []).length > 1 ? 'min-w-[320px]' : ''}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {review.patient?.user?.email || 'Patient'}
+                    </p>
+                    <p className="inline-flex items-center gap-1 text-sm text-amber-600">
+                      <Star size={14} /> {review.note}/5
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-600">{review.commentaire || 'Aucun commentaire.'}</p>
+                </Card>
+              ))}
+            </div>
           </MotionDiv>
-        ) : null}
+        </section>
 
-        {activeTab === 'location' ? (
+        <section className="space-y-4">
           <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
             {canShowMap ? (
               <>
@@ -771,7 +673,7 @@ function DoctorProfilePage() {
               </Card>
             )}
           </MotionDiv>
-        ) : null}
+        </section>
       </Card>
 
       <AccessPromptModal

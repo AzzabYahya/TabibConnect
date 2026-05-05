@@ -4,7 +4,6 @@ import { createBrowserRouter } from 'react-router-dom';
 import AppShell from '../layout/AppShell';
 import PrivateRoute from '../components/common/PrivateRoute';
 import AppointmentDetailPage from '../pages/AppointmentDetailPage';
-import AdminAccountDetailPage from '../pages/AdminAccountDetailPage';
 import DoctorProfilePage from '../pages/DoctorProfilePage';
 import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
@@ -16,16 +15,19 @@ import PaymentCancelPage from '../pages/PaymentCancelPage';
 import AdminDashboardLayout from '../layout/AdminDashboardLayout';
 import DoctorDashboardLayout from '../layout/DoctorDashboardLayout';
 import PatientDashboardLayout from '../layout/PatientDashboardLayout';
+import UserProfilePage from '../pages/UserProfilePage';
 
 const searchPageLoader = lazy(() => import('../pages/SearchPage'));
 const dashboardPatientPageLoader = lazy(() => import('../pages/DashboardPatientPage'));
 const adminOverviewPageLoader = lazy(() => import('../pages/AdminOverviewPage'));
 const adminUsersPageLoader = lazy(() => import('../pages/AdminUsersPage'));
+const adminPatientsPageLoader = lazy(() => import('../pages/AdminPatientsPage'));
 const adminDoctorsPageLoader = lazy(() => import('../pages/AdminDoctorsPage'));
 const adminReviewsPageLoader = lazy(() => import('../pages/AdminReviewsPage'));
 const adminMetricsPageLoader = lazy(() => import('../pages/AdminMetricsPage'));
 const adminLogsPageLoader = lazy(() => import('../pages/AdminLogsPage'));
 const adminNotificationsPageLoader = lazy(() => import('../pages/AdminNotificationsPage'));
+const adminRequestsPageLoader = lazy(() => import('../pages/AdminRequestsPage'));
 
 const doctorAgendaPageLoader = lazy(() => import('../pages/DoctorAgendaPage'));
 const doctorAvailabilityPageLoader = lazy(() => import('../pages/DoctorAvailabilityPage'));
@@ -33,6 +35,8 @@ const doctorPatientsPageLoader = lazy(() => import('../pages/DoctorPatientsPage'
 const doctorProfileCabinetPageLoader = lazy(() => import('../pages/DoctorProfileCabinetPage'));
 const doctorStatsPageLoader = lazy(() => import('../pages/DoctorStatsPage'));
 const doctorReviewsPageLoader = lazy(() => import('../pages/DoctorReviewsPage'));
+
+const patientProfilePageLoader = lazy(() => import('../pages/PatientProfilePage'));
 
 const withRouteSuspense = (element) => (
   <Suspense
@@ -100,6 +104,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: withRouteSuspense(createElement(dashboardPatientPageLoader)) },
+          { path: 'profile', element: withRouteSuspense(createElement(patientProfilePageLoader)) },
         ],
       },
       {
@@ -139,8 +144,16 @@ const router = createBrowserRouter([
             element: withRouteSuspense(createElement(adminOverviewPageLoader)),
           },
           {
+            path: 'requests',
+            element: withRouteSuspense(createElement(adminRequestsPageLoader)),
+          },
+          {
             path: 'users',
             element: withRouteSuspense(createElement(adminUsersPageLoader)),
+          },
+          {
+            path: 'patients',
+            element: withRouteSuspense(createElement(adminPatientsPageLoader)),
           },
           {
             path: 'doctors',
@@ -172,7 +185,7 @@ const router = createBrowserRouter([
             title="Continuez votre réservation"
             subtitle="Créez un compte ou connectez-vous pour consulter votre espace administrateur."
           >
-            <AdminAccountDetailPage />
+            <UserProfilePage />
           </PrivateRoute>
         ),
       },

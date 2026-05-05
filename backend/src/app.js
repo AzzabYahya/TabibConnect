@@ -15,6 +15,8 @@ const healthRoutes = require('./routes/healthRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const userRoutes = require('./routes/userRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 const { csrfErrorHandler } = require('./middlewares/csrfProtection');
 const errorHandler = require('./middlewares/errorHandler');
 const sanitizeInputs = require('./middlewares/sanitizeInputs');
@@ -58,6 +60,8 @@ app.use('/api/doctors', doctorRoutes);
 app.use('/api/cabinets', cabinetRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/patients', patientRoutes);
 
 app.use('/api', healthRoutes);
 

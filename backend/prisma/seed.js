@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { PrismaClient, Prisma } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -882,6 +884,35 @@ const addDays = (date, days) => new Date(date.getTime() + days * 24 * 60 * 60 * 
 const buildIsoDate = (baseDate, dayOffset, hourOffset = 0) =>
   new Date(addDays(baseDate, dayOffset).getTime() + hourOffset * 60 * 60 * 1000).toISOString();
 
+const pickFromPool = (pool, index) => pool[index % pool.length];
+
+const getSeedFileMeta = (relativePath) => {
+  const absolutePath = path.resolve(__dirname, '..', relativePath);
+  const fileName = path.basename(relativePath);
+  const extension = path.extname(fileName).toLowerCase();
+  const mimeTypeByExtension = {
+    '.pdf': 'application/pdf',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  };
+
+  let size = 0;
+  try {
+    size = fs.statSync(absolutePath).size;
+  } catch {
+    size = 0;
+  }
+
+  return {
+    fileName,
+    filePath: relativePath,
+    mimeType: mimeTypeByExtension[extension] || 'application/octet-stream',
+    size,
+  };
+};
+
 const extraCityCatalog = [
   {
     ville: 'Tanger',
@@ -931,10 +962,34 @@ const extraCityCatalog = [
     latitude: '27.153610',
     longitude: '-13.203340',
   },
+  {
+    ville: 'Nador',
+    quartiers: ['Al Matar', 'Beni Ensar', 'Centre Ville'],
+    latitude: '35.168905',
+    longitude: '-2.933523',
+  },
+  {
+    ville: 'Beni Mellal',
+    quartiers: ['Agdal', 'Ouled Hamdane', 'Centre Ville'],
+    latitude: '32.337086',
+    longitude: '-6.349322',
+  },
+  {
+    ville: 'Errachidia',
+    quartiers: ['Centre Ville', 'Hay Moulay Ali Cherif', 'Medina'],
+    latitude: '31.931364',
+    longitude: '-4.426637',
+  },
+  {
+    ville: 'Dakhla',
+    quartiers: ['Centre Ville', 'Hay Al Wahda', 'Corniche'],
+    latitude: '23.684770',
+    longitude: '-15.957980',
+  },
 ];
 
-const patientFirstNames = ['Rania', 'Salma', 'Hajar', 'Amina', 'Nour', 'Sanae'];
-const patientLastNames = ['El Amrani', 'Bennani', 'El Idrissi', 'El Mansouri'];
+const patientFirstNames = ['Rania', 'Salma', 'Hajar', 'Amina', 'Nour', 'Sanae', 'Imane', 'Sara', 'Khadija', 'Meryem', 'Lina', 'Aya', 'Yasmine', 'Asma'];
+const patientLastNames = ['El Amrani', 'Bennani', 'El Idrissi', 'El Mansouri', 'Ait Ali', 'Berrada', 'Fassi', 'Ziani', 'Alaoui', 'Touimi'];
 const patientCities = [
   'Casablanca',
   'Rabat',
@@ -949,6 +1004,10 @@ const patientCities = [
   'Safi',
   'El Jadida',
   'Laayoune',
+  'Nador',
+  'Beni Mellal',
+  'Errachidia',
+  'Dakhla',
 ];
 const patientBloodTypes = ['O_POS', 'A_POS', 'B_POS', 'AB_POS', 'O_NEG', 'A_NEG', 'B_NEG', 'AB_NEG'];
 const patientAntecedentPool = [
@@ -962,8 +1021,32 @@ const patientAntecedentPool = [
   'Tension elevee sous surveillance',
 ];
 
-const doctorFirstNames = ['Meryem', 'Nadia', 'Hamza', 'Youssef'];
-const doctorLastNames = ['Bakkali', 'El Fassi', 'Saidi', 'Amrani'];
+const doctorFirstNames = ['Meryem', 'Nadia', 'Hamza', 'Youssef', 'Amina', 'Sara', 'Omar', 'Khalid', 'Lina', 'Aya'];
+const doctorLastNames = ['Bakkali', 'El Fassi', 'Saidi', 'Amrani', 'Bennani', 'El Idrissi', 'Ait Lahcen', 'Lahlou', 'Toumi', 'Azzouzi'];
+const patientCinPhotoPool = [
+  'uploads/documents/1777373814924-146482747-cin_maroc-1024x670.jpg',
+  'uploads/documents/1777373874441-881288939-cin_maroc-1024x670.jpg',
+  'uploads/documents/1777373880363-801025610-cin_maroc-1024x670.jpg',
+  'uploads/documents/1777374162294-535149088-cin_maroc-1024x670.jpg',
+  'uploads/documents/1777374170039-901815460-cin_maroc-1024x670.jpg',
+  'uploads/documents/1777562677308-127306106-cin_maroc-1024x670.jpg',
+];
+const profilePhotoPool = [
+  'uploads/documents/1777374146034-572627411-download.png',
+  'uploads/documents/1777374146037-578328700-banner-04.jpg',
+  'uploads/documents/1777374151985-348949338-download.png',
+  'uploads/documents/1777374151985-431930766-banner-04.jpg',
+  'uploads/documents/1777562677305-385031539-banner-04.jpg',
+  'uploads/documents/1777727384365-850967433-image-yahya.jpeg',
+  'uploads/documents/1777892082202-182885748-image-yahya.jpeg',
+  'uploads/documents/1777912526435-423343602-image-yahya.jpeg',
+  'uploads/documents/1777941831931-372191833-wallpapersden.com_muzan-kibutsuji-demon-slayer_2560x1440.jpg',
+];
+const doctorSupportingDocPool = [
+  'uploads/documents/1777046479746-782394478-inpetestyahyadr.pdf',
+  'uploads/documents/1777373758181-574124961-document-sans-titre.pdf',
+  'uploads/documents/1777373762113-936880416-document-sans-titre.pdf',
+];
 const cabinetPhotoPool = [
   'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200',
   'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200',
@@ -1231,7 +1314,7 @@ const buildExtraAppointmentSeeds = () => {
   const consultationTypes = ['PRESENTIEL', 'TELECONSULTATION'];
   const baseDate = new Date('2026-04-28T08:00:00.000Z');
 
-  return Array.from({ length: 48 }, (_, index) => {
+  return Array.from({ length: 220 }, (_, index) => {
     const patient = activePatients[index % activePatients.length];
     const doctor = activeDoctors[index % activeDoctors.length];
     const template = doctorSpecialtyTemplates[index % doctorSpecialtyTemplates.length];
@@ -1270,9 +1353,9 @@ const buildExtraReviewSeeds = () => {
   const completedAppointments = appointmentSeeds.filter(
     (appointment) => appointment.statut === 'COMPLETE' && !alreadyReviewedKeys.has(appointment.key)
   );
-  const reviewNotes = [5, 5, 4, 5, 4, 5, 5, 4, 5, 4, 5, 5];
+  const reviewNotes = [5, 5, 4, 5, 4, 5, 5, 4, 5, 4, 5, 5, 4, 5, 5, 4, 5, 4];
 
-  return completedAppointments.slice(0, 24).map((appointment, index) => {
+  return completedAppointments.slice(0, 60).map((appointment, index) => {
     const doctor = doctorSeeds.find((item) => item.key === appointment.doctorKey);
     const template = doctorSpecialtyTemplates[index % doctorSpecialtyTemplates.length];
 
@@ -1293,7 +1376,7 @@ const buildExtraNotificationSeeds = () => {
   const extraNotifications = [];
   const activePatients = patientSeeds;
   const activeDoctors = doctorSeeds;
-  const relevantAppointments = appointmentSeeds.slice(0, 36);
+  const relevantAppointments = appointmentSeeds.slice(0, 120);
 
   relevantAppointments.forEach((appointment, index) => {
     const patient = activePatients.find((item) => item.key === appointment.patientKey) || activePatients[index % activePatients.length];
@@ -1357,7 +1440,7 @@ const buildExtraPaymentSeeds = () => {
   );
   const paymentMethods = ['CASH', 'CMI', 'VIREMENT'];
 
-  return payableAppointments.slice(0, 24).map((appointment, index) => {
+  return payableAppointments.slice(0, 60).map((appointment, index) => {
     const doctor = doctorSeeds.find((item) => item.key === appointment.doctorKey);
     const status = index % 7 === 0 ? 'EN_ATTENTE' : index % 11 === 0 ? 'REMBOURSE' : 'PAYE';
     const amount = doctor?.tarifConsultation || '300.00';
@@ -1370,6 +1453,111 @@ const buildExtraPaymentSeeds = () => {
       methode: paymentMethods[index % paymentMethods.length],
       statut: status,
       reference: `PAY-TC-2026-${String(2000 + index).padStart(4, '0')}`,
+    };
+  });
+};
+
+const buildExtraPatientDocumentSeeds = () =>
+  patientSeeds.map((patient, index) => {
+    const profilePhotoPath = pickFromPool(profilePhotoPool, index);
+    const photoMeta = getSeedFileMeta(profilePhotoPath);
+
+    return {
+      key: `patient-photo-${index + 1}`,
+      patientKey: patient.key,
+      ...photoMeta,
+      isProfilePhoto: true,
+    };
+  });
+
+const buildExtraDoctorProfilePhotoSeeds = () =>
+  doctorSeeds.map((doctor, index) => {
+    const profilePhotoPath = pickFromPool(profilePhotoPool, index + 3);
+    const photoMeta = getSeedFileMeta(profilePhotoPath);
+
+    return {
+      key: `doctor-photo-${index + 1}`,
+      doctorKey: doctor.key,
+      ...photoMeta,
+      isProfilePhoto: true,
+    };
+  });
+
+const buildExtraPatientChangeRequestSeeds = () => {
+  const statuses = ['PENDING', 'APPROVED', 'REJECTED'];
+
+  return patientSeeds.slice(0, 30).map((patient, index) => {
+    const status = statuses[index % statuses.length];
+    return {
+      key: `patient-change-${index + 1}`,
+      patientKey: patient.key,
+      status,
+      reason: index % 2 === 0 ? 'Mise a jour de l adresse et de la ville' : 'Correction du groupe sanguin et des antecedents',
+      payload: {
+        adresse: `${patient.ville} - Residence ${index + 1}`,
+        ville: patient.ville,
+        groupeSanguin: patient.groupeSanguin,
+        antecedents: `${patient.antecedents || 'Aucun antecedent'} (validation dossier ${index + 1})`,
+      },
+      reviewNote: status === 'REJECTED' ? 'Piece justificative insuffisante' : status === 'APPROVED' ? 'Infos valides' : null,
+      reviewedByUserKey: status === 'PENDING' ? null : adminSeed.key,
+    };
+  });
+};
+
+const buildExtraDoctorChangeRequestSeeds = () => {
+  const statuses = ['PENDING', 'APPROVED', 'REJECTED'];
+
+  return doctorSeeds.slice(0, 36).map((doctor, index) => {
+    const status = statuses[(index + 1) % statuses.length];
+    const template = doctorSpecialtyTemplates[index % doctorSpecialtyTemplates.length];
+
+    return {
+      key: `doctor-change-${index + 1}`,
+      doctorKey: doctor.key,
+      type: index % 2 === 0 ? 'PROFILE_UPDATE' : 'LOCATION_UPDATE',
+      status,
+      reason: index % 2 === 0 ? 'Mise a jour du profil medical' : 'Ajout ou correction du cabinet',
+      payload: index % 2 === 0
+        ? {
+            nomComplet: doctor.nomComplet,
+            specialite: doctor.specialite,
+            tarifConsultation: String(doctor.tarifConsultation),
+            experience: doctor.experience,
+            languesParlees: doctor.languesParlees,
+            diplomes: doctor.diplomes,
+            accepteAssurance: doctor.accepteAssurance,
+            assurancesAcceptees: doctor.assurancesAcceptees,
+            bio: `${doctor.bio || template.bio} (mise a jour ${index + 1})`,
+          }
+        : {
+            nom: `${doctor.nomComplet} Cabinet ${index + 1}`,
+            ville: extraCityCatalog[index % extraCityCatalog.length].ville,
+            adresse: `${extraCityCatalog[index % extraCityCatalog.length].quartiers[0]}, ${extraCityCatalog[index % extraCityCatalog.length].ville}`,
+            quartier: extraCityCatalog[index % extraCityCatalog.length].quartiers[0],
+            latitude: extraCityCatalog[index % extraCityCatalog.length].latitude,
+            longitude: extraCityCatalog[index % extraCityCatalog.length].longitude,
+          },
+      reviewNote: status === 'REJECTED' ? 'Documents complementaires requis' : status === 'APPROVED' ? 'Validation complete' : null,
+      reviewedByUserKey: status === 'PENDING' ? null : adminSeed.key,
+    };
+  });
+};
+
+const buildExtraDoctorPatientNoteSeeds = () => {
+  const completedAppointments = appointmentSeeds.filter((appointment) => appointment.statut === 'COMPLETE');
+
+  return completedAppointments.slice(0, 60).map((appointment, index) => {
+    const doctor = doctorSeeds.find((item) => item.key === appointment.doctorKey);
+    const patient = patientSeeds.find((item) => item.key === appointment.patientKey);
+
+    return {
+      key: `doctor-patient-note-${index + 1}`,
+      doctorKey: appointment.doctorKey,
+      patientKey: appointment.patientKey,
+      rendezVousKey: appointment.key,
+      note: `Suivi clinique: ${patient?.ville || 'Maroc'} - ${doctor?.specialite || 'consultation generale'} - dossier ${index + 1}`,
+      isVisibleToPeers: index % 3 === 0,
     };
   });
 };
@@ -1390,8 +1578,8 @@ const maybeDate = (value) => (value ? toDate(value) : undefined);
 const createRows = async (items, createRow) => {
   const rows = [];
 
-  for (const item of items) {
-    rows.push(await createRow(item));
+  for (const [index, item] of items.entries()) {
+    rows.push(await createRow(item, index));
   }
 
   return rows;
@@ -1405,10 +1593,14 @@ async function main() {
   await prisma.paiement.deleteMany();
   await prisma.avis.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.doctorPatientNote.deleteMany();
+  await prisma.patientChangeRequest.deleteMany();
+  await prisma.doctorChangeRequest.deleteMany();
   await prisma.rendezVous.deleteMany();
   await prisma.disponibilite.deleteMany();
   await prisma.doctorCabinet.deleteMany();
   await prisma.doctorDocument.deleteMany();
+  await prisma.patientDocument.deleteMany();
   await prisma.cabinet.deleteMany();
   await prisma.doctor.deleteMany();
   await prisma.patient.deleteMany();
@@ -1458,7 +1650,8 @@ async function main() {
   patientUsers.forEach((user) => createdUsers.set(user.key, user));
   doctorUsers.forEach((user) => createdUsers.set(user.key, user));
 
-  const patients = await createRows(patientSeeds, async (seed) => {
+  const patients = await createRows(patientSeeds, async (seed, index) => {
+    const cinMeta = getSeedFileMeta(pickFromPool(patientCinPhotoPool, index));
     const patient = await prisma.patient.create({
       data: {
         userId: createdUsers.get(seed.key).id,
@@ -1469,13 +1662,23 @@ async function main() {
         ville: seed.ville,
         groupeSanguin: seed.groupeSanguin,
         antecedents: seed.antecedents,
+        cinDocumentFileName: cinMeta.fileName,
+        cinDocumentFilePath: cinMeta.filePath,
+        cinDocumentMimeType: cinMeta.mimeType,
+        cinDocumentSize: cinMeta.size,
+        cinDocumentUploadedAt: new Date(),
+        cinDocumentVerificationStatus: 'VERIFIED',
+        cinDocumentVerificationScore: 95 - (index % 5),
+        cinDocumentVerificationNote: 'CIN marocain valide et conforme',
+        cinDocumentVerifiedAt: new Date(),
       },
     });
 
     return { key: seed.key, ...patient };
   });
 
-  const doctors = await createRows(doctorSeeds, async (seed) => {
+  const doctors = await createRows(doctorSeeds, async (seed, index) => {
+    const cinMeta = getSeedFileMeta(pickFromPool(patientCinPhotoPool, index + 1));
     const doctor = await prisma.doctor.create({
       data: {
         userId: createdUsers.get(seed.key).id,
@@ -1489,6 +1692,15 @@ async function main() {
         assurancesAcceptees: seed.assurancesAcceptees,
         bio: seed.bio,
         experience: seed.experience,
+        cinDocumentFileName: cinMeta.fileName,
+        cinDocumentFilePath: cinMeta.filePath,
+        cinDocumentMimeType: cinMeta.mimeType,
+        cinDocumentSize: cinMeta.size,
+        cinDocumentUploadedAt: new Date(),
+        cinDocumentVerificationStatus: 'VERIFIED',
+        cinDocumentVerificationScore: 96 - (index % 4),
+        cinDocumentVerificationNote: 'CIN professionnel marocain valide',
+        cinDocumentVerifiedAt: new Date(),
       },
     });
 
@@ -1576,6 +1788,69 @@ async function main() {
     }
   );
 
+  await createRows(buildExtraPatientDocumentSeeds(), async (seed) => {
+    const document = await prisma.patientDocument.create({
+      data: {
+        patientId: patientByKey.get(seed.patientKey).id,
+        fileName: seed.fileName,
+        filePath: seed.filePath,
+        mimeType: seed.mimeType,
+        size: seed.size,
+        isProfilePhoto: seed.isProfilePhoto,
+      },
+    });
+
+    return { key: seed.key, ...document };
+  });
+
+  await createRows(buildExtraDoctorProfilePhotoSeeds(), async (seed) => {
+    const document = await prisma.doctorDocument.create({
+      data: {
+        doctorId: doctorByKey.get(seed.doctorKey).id,
+        fileName: seed.fileName,
+        filePath: seed.filePath,
+        mimeType: seed.mimeType,
+        size: seed.size,
+        isProfilePhoto: seed.isProfilePhoto,
+      },
+    });
+
+    return { key: seed.key, ...document };
+  });
+
+  await createRows(buildExtraPatientChangeRequestSeeds(), async (seed) => {
+    const request = await prisma.patientChangeRequest.create({
+      data: {
+        patientId: patientByKey.get(seed.patientKey).id,
+        status: seed.status,
+        reason: seed.reason,
+        payload: seed.payload,
+        reviewNote: seed.reviewNote,
+        reviewedByUserId: seed.reviewedByUserKey ? createdUsers.get(seed.reviewedByUserKey).id : null,
+        reviewedAt: seed.reviewedByUserKey ? new Date() : null,
+      },
+    });
+
+    return { key: seed.key, ...request };
+  });
+
+  await createRows(buildExtraDoctorChangeRequestSeeds(), async (seed) => {
+    const request = await prisma.doctorChangeRequest.create({
+      data: {
+        doctorId: doctorByKey.get(seed.doctorKey).id,
+        type: seed.type,
+        status: seed.status,
+        reason: seed.reason,
+        payload: seed.payload,
+        reviewNote: seed.reviewNote,
+        reviewedByUserId: seed.reviewedByUserKey ? createdUsers.get(seed.reviewedByUserKey).id : null,
+        reviewedAt: seed.reviewedByUserKey ? new Date() : null,
+      },
+    });
+
+    return { key: seed.key, ...request };
+  });
+
   const rendezVousRows = await createRows(appointmentSeeds, async (seed) => {
     const appointment = await prisma.rendezVous.create({
       data: {
@@ -1605,6 +1880,20 @@ async function main() {
   });
 
   const rendezVousByKey = mapByKey(rendezVousRows);
+
+  await createRows(buildExtraDoctorPatientNoteSeeds(), async (seed) => {
+    const note = await prisma.doctorPatientNote.create({
+      data: {
+        doctorId: doctorByKey.get(seed.doctorKey).id,
+        patientId: patientByKey.get(seed.patientKey).id,
+        rendezVousId: rendezVousByKey.get(seed.rendezVousKey).id,
+        note: seed.note,
+        isVisibleToPeers: seed.isVisibleToPeers,
+      },
+    });
+
+    return { key: seed.key, ...note };
+  });
 
   await createRows(reviewSeeds, async (seed) => {
     const review = await prisma.avis.create({

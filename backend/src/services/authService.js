@@ -216,6 +216,10 @@ const registerDoctor = async (payload, files = [], cinDocumentFile = null) => {
   if (!files.length) {
     throw new HttpError(400, 'At least one verification document is required');
   }
+  const hasProfilePhoto = files.some((file) => String(file.mimetype || '').startsWith('image/'));
+  if (!hasProfilePhoto) {
+    throw new HttpError(400, 'A profile photo is required (image file)');
+  }
   if (!cinDocumentFile) {
     throw new HttpError(400, 'National ID document is required');
   }
@@ -555,7 +559,38 @@ const resetPassword = async ({ token, password }) => {
   });
 };
 
+const changePassword = async ({ userId, currentPassword, newPassword }) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      password: true,
+    },
+  });
+
+  if (!user) {
+    throw new HttpError(404, 'User not found');
+  }
+
+  const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isPasswordValid) {
+    throw new HttpError(400, 'Current password is incorrect');
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, env.bcryptSaltRounds);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      password: hashedPassword,
+      refreshTokenHash: null,
+      refreshTokenExpiresAt: null,
+    },
+  });
+};
+
 module.exports = {
+  changePassword,
   forgotPassword,
   getCurrentUser,
   login,

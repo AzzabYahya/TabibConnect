@@ -11,6 +11,7 @@ const {
 const uploadDoctorDocuments = require('../middlewares/uploadDoctorDocuments');
 const validateRequest = require('../middlewares/validateRequest');
 const {
+  changePasswordValidator,
   deleteAccountValidator,
   forgotPasswordValidator,
   loginValidator,
@@ -112,6 +113,15 @@ router.post(
   resetPasswordValidator,
   validateRequest,
   asyncHandler(authController.resetPassword)
+);
+
+router.post(
+  '/change-password',
+  authenticate,
+  doubleCsrfProtection,
+  changePasswordValidator,
+  validateRequest,
+  asyncHandler(authController.changePassword)
 );
 
 module.exports = router;

@@ -551,9 +551,51 @@ const markPatientNotificationsRead = async ({ userId }) => {
   return { updated: result.count };
 };
 
+const getPatientProfileManagement = async ({ userId }) => {
+  const patient = await getPatientContext(userId);
+
+  // Get patient profile data
+  const patientData = await prisma.patient.findUnique({
+    where: { id: patient.id },
+    select: {
+      id: true,
+      adresse: true,
+      ville: true,
+      groupeSanguin: true,
+      antecedents: true,
+    },
+  });
+
+  // Get patient change requests
+  const changeRequests = await prisma.patientChangeRequest.findMany({
+    where: { patientId: patient.id },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Get patient profile photo URL (latest profile photo document)
+  const latestProfilePhoto = await prisma.patientDocument.findFirst({
+    where: { patientId: patient.id, isProfilePhoto: true },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      fileName: true,
+      filePath: true,
+    },
+  });
+
+  const profilePhotoUrl = latestProfilePhoto ? `/api/patients/${patient.id}/profile-photo` : null;
+
+  return {
+    profile: patientData,
+    changeRequests,
+    profilePhotoUrl,
+  };
+};
+
 module.exports = {
   getAppointmentDetails,
   getPatientDashboard,
+  getPatientProfileManagement,
   getPatientHistory,
   getPatientRecurringDoctors,
   getPatientNotifications,

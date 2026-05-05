@@ -40,6 +40,18 @@ const updateDoctorProfile = async (req, res) => {
   });
 };
 
+const uploadDoctorProfilePhoto = async (req, res) => {
+  const result = await doctorService.uploadDoctorProfilePhoto({
+    userId: req.user.id,
+    file: req.file,
+  });
+  res.status(200).json({
+    status: 'success',
+    message: 'Photo de profil envoyée. Validation admin requise.',
+    data: result,
+  });
+};
+
 const getDoctorAvailabilities = async (req, res) => {
   const availabilities = await doctorService.getDoctorAvailabilitiesForDate({
     doctorId: req.params.id,
@@ -213,6 +225,7 @@ module.exports = {
   updateDoctorChangeRequest,
   cancelDoctorChangeRequest,
   updateDoctorProfile,
+  uploadDoctorProfilePhoto,
   getDoctorAgenda,
   listDoctorPatients,
   getDoctorReceivedReviews,

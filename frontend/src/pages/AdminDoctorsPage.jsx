@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -9,16 +10,50 @@ import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 
 function AdminDoctorsPage() {
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('PENDING');
+  const navigate = useNavigate();
+  const [pendingPage, setPendingPage] = useState(1);
+  const [verifiedPage, setVerifiedPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortDir, setSortDir] = useState('desc');
   const [rejecting, setRejecting] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const query = useQuery({
-    queryKey: ['admin-doctors', page, status, search],
+  useEffect(() => {
+    setPendingPage(1);
+    setVerifiedPage(1);
+  }, [search, sortBy, sortDir]);
+
+  const pendingQuery = useQuery({
+    queryKey: ['admin-doctors-pending', pendingPage, search, sortBy, sortDir],
     queryFn: async () => {
-      const response = await api.get('/admin/doctors', { params: { page, limit: 20, status, search } });
+      const response = await api.get('/admin/doctors', {
+        params: {
+          page: pendingPage,
+          limit: 20,
+          status: 'PENDING',
+          search,
+          sortBy,
+          sortDir,
+        },
+      });
+      return response.data?.data;
+    },
+  });
+
+  const verifiedQuery = useQuery({
+    queryKey: ['admin-doctors-verified', verifiedPage, search, sortBy, sortDir],
+    queryFn: async () => {
+      const response = await api.get('/admin/doctors', {
+        params: {
+          page: verifiedPage,
+          limit: 20,
+          status: 'VERIFIED',
+          search,
+          sortBy,
+          sortDir,
+        },
+      });
       return response.data?.data;
     },
   });
@@ -27,7 +62,8 @@ function AdminDoctorsPage() {
     mutationFn: async (doctorId) => api.post(`/admin/doctors/${doctorId}/verify`),
     onSuccess: async () => {
       toast.success('Médecin validé.');
-      await query.refetch();
+      await pendingQuery.refetch();
+      await verifiedQuery.refetch();
     },
     onError: (error) => toast.error(error?.response?.data?.message || 'Validation impossible.'),
   });
@@ -38,60 +74,66 @@ function AdminDoctorsPage() {
       toast.success('Médecin rejeté.');
       setRejecting(null);
       setRejectReason('');
-      await query.refetch();
+      await pendingQuery.refetch();
+      await verifiedQuery.refetch();
     },
     onError: (error) => toast.error(error?.response?.data?.message || 'Rejet impossible.'),
   });
 
-  const items = query.data?.items || [];
-  const pagination = query.data?.pagination;
-  const pendingCount = useMemo(() => items.filter((d) => !d.isVerified).length, [items]);
+  const pendingItems = pendingQuery.data?.items || [];
+  const pendingPagination = pendingQuery.data?.pagination;
+  const verifiedItems = verifiedQuery.data?.items || [];
+  const verifiedPagination = verifiedQuery.data?.pagination;
 
   return (
     <div className="space-y-4">
       <Card className="grid gap-2 md:grid-cols-3">
         <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Recherche (nom, email, INPE, spécialité)..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="rounded-xl border px-3 py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="PENDING">En attente</option>
-          <option value="VERIFIED">Vérifiés</option>
-          <option value="ALL">Tous</option>
+        <select className="rounded-xl border px-3 py-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <option value="createdAt">Tri: Date création</option>
+          <option value="name">Tri: Nom</option>
+          <option value="email">Tri: Email</option>
         </select>
-        <div className="rounded-xl border bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          En attente sur cette page: <span className="font-semibold">{pendingCount}</span>
-        </div>
+        <select className="rounded-xl border px-3 py-2 text-sm" value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
+          <option value="desc">Ordre: Descendant</option>
+          <option value="asc">Ordre: Ascendant</option>
+        </select>
       </Card>
 
-      <Card className="overflow-x-auto">
-        {query.isLoading ? (
-          <div className="space-y-2">{Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+      <Card className="space-y-3 overflow-x-auto">
+        <p className="px-1 text-sm font-semibold text-slate-900">Médecins en attente</p>
+        {pendingQuery.isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`pending-${i}`} className="h-10" />)}</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="tc-table min-w-[960px] text-sm">
             <thead>
               <tr className="text-left text-slate-500">
                 <th className="py-2">Médecin</th>
                 <th>INPE</th>
                 <th>Spécialité</th>
                 <th>Ville</th>
-                <th>Statut</th>
+                <th>Photo profil</th>
                 <th>Créé le</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((doc) => (
+              {pendingItems.map((doc) => (
                 <tr key={doc.id} className="border-t">
                   <td className="py-2">
-                    <p className="font-semibold text-slate-900">{doc.name}</p>
-                    <p className="text-xs text-slate-500">{doc.email}</p>
+                    <button type="button" className="text-left" onClick={() => navigate(`/dashboard/admin/accounts/${doc.userId}`)}>
+                      <p className="font-semibold text-slate-900 hover:underline">{doc.name}</p>
+                      <p className="text-xs text-slate-500">{doc.email}</p>
+                    </button>
                   </td>
                   <td>{doc.inpe}</td>
                   <td>{doc.specialty}</td>
                   <td>{doc.city || '-'}</td>
-                  <td>{doc.isVerified ? 'VERIFIE' : 'EN_ATTENTE'}</td>
+                  <td>{doc.documents?.some((item) => String(item.mimeType || '').startsWith('image/')) ? 'OK' : 'MANQUANTE'}</td>
                   <td>{new Date(doc.createdAt).toLocaleDateString('fr-MA')}</td>
                   <td className="py-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => verifyMutation.mutate(doc.id)} disabled={verifyMutation.isPending || doc.isVerified}>
+                    <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <Button size="sm" onClick={() => verifyMutation.mutate(doc.id)} disabled={verifyMutation.isPending}>
                         Valider
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setRejecting(doc)} disabled={rejectMutation.isPending}>
@@ -101,16 +143,79 @@ function AdminDoctorsPage() {
                   </td>
                 </tr>
               ))}
+              {!pendingItems.length ? (
+                <tr>
+                  <td colSpan={7} className="py-3 text-sm text-slate-600">
+                    Aucun médecin en attente.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         )}
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={!pendingPagination?.hasPrevPage} onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>←</Button>
+          <span className="text-sm">{pendingPagination?.page || 1} / {pendingPagination?.totalPages || 1}</span>
+          <Button variant="outline" size="sm" disabled={!pendingPagination?.hasNextPage} onClick={() => setPendingPage((p) => p + 1)}>→</Button>
+        </div>
       </Card>
 
-      <div className="flex items-center justify-center gap-2">
-        <Button variant="outline" size="sm" disabled={!pagination?.hasPrevPage} onClick={() => setPage((p) => Math.max(1, p - 1))}>←</Button>
-        <span className="text-sm">{pagination?.page || 1} / {pagination?.totalPages || 1}</span>
-        <Button variant="outline" size="sm" disabled={!pagination?.hasNextPage} onClick={() => setPage((p) => p + 1)}>→</Button>
-      </div>
+      <Card className="space-y-3 overflow-x-auto">
+        <p className="px-1 text-sm font-semibold text-slate-900">Médecins vérifiés</p>
+        {verifiedQuery.isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`verified-${i}`} className="h-10" />)}</div>
+        ) : (
+          <table className="tc-table min-w-[960px] text-sm">
+            <thead>
+              <tr className="text-left text-slate-500">
+                <th className="py-2">Médecin</th>
+                <th>INPE</th>
+                <th>Spécialité</th>
+                <th>Ville</th>
+                <th>Photo profil</th>
+                <th>Créé le</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {verifiedItems.map((doc) => (
+                <tr key={doc.id} className="border-t">
+                  <td className="py-2">
+                    <button type="button" className="text-left" onClick={() => navigate(`/dashboard/admin/accounts/${doc.userId}`)}>
+                      <p className="font-semibold text-slate-900 hover:underline">{doc.name}</p>
+                      <p className="text-xs text-slate-500">{doc.email}</p>
+                    </button>
+                  </td>
+                  <td>{doc.inpe}</td>
+                  <td>{doc.specialty}</td>
+                  <td>{doc.city || '-'}</td>
+                  <td>{doc.documents?.some((item) => String(item.mimeType || '').startsWith('image/')) ? 'OK' : 'MANQUANTE'}</td>
+                  <td>{new Date(doc.createdAt).toLocaleDateString('fr-MA')}</td>
+                  <td className="py-2">
+                    <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <Button size="sm" variant="outline" onClick={() => setRejecting(doc)} disabled={rejectMutation.isPending}>
+                        Rejeter
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!verifiedItems.length ? (
+                <tr>
+                  <td colSpan={7} className="py-3 text-sm text-slate-600">
+                    Aucun médecin vérifié.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        )}
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={!verifiedPagination?.hasPrevPage} onClick={() => setVerifiedPage((p) => Math.max(1, p - 1))}>←</Button>
+          <span className="text-sm">{verifiedPagination?.page || 1} / {verifiedPagination?.totalPages || 1}</span>
+          <Button variant="outline" size="sm" disabled={!verifiedPagination?.hasNextPage} onClick={() => setVerifiedPage((p) => p + 1)}>→</Button>
+        </div>
+      </Card>
 
       <Modal
         isOpen={Boolean(rejecting)}

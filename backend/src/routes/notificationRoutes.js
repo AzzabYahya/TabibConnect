@@ -1,8 +1,10 @@
 const express = require('express');
+const { body, query } = require('express-validator');
 
 const authenticate = require('../middlewares/authenticate');
 const asyncHandler = require('../utils/asyncHandler');
 const prisma = require('../config/prisma');
+const validateRequest = require('../middlewares/validateRequest');
 
 const router = express.Router();
 
@@ -10,9 +12,12 @@ router.use(authenticate);
 
 router.get(
   '/',
+  query('page').optional().isInt({ min: 1 }).toInt(),
+  query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+  validateRequest,
   asyncHandler(async (req, res) => {
-    const page = Math.max(1, Number(req.query.page || 1));
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 20;
     const where = { userId: req.user.id };
     const [items, total] = await Promise.all([
       prisma.notification.findMany({
@@ -52,6 +57,9 @@ router.get(
 
 router.post(
   '/mark-read',
+  body('ids').optional().isArray({ min: 1 }),
+  body('ids.*').optional().isString().isLength({ min: 10, max: 40 }),
+  validateRequest,
   asyncHandler(async (req, res) => {
     const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
     const where = ids

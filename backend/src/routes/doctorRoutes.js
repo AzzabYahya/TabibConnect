@@ -1,8 +1,10 @@
 const express = require('express');
 
 const doctorController = require('../controllers/doctorController');
+const doctorFileController = require('../controllers/doctorFileController');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
+const uploadDoctorDocuments = require('../middlewares/uploadDoctorDocuments');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   doctorCreateAvailabilityValidator,
@@ -37,6 +39,14 @@ router.put(
   doctorUpdateProfileValidator,
   validateRequest,
   asyncHandler(doctorController.updateDoctorProfile)
+);
+
+router.post(
+  '/me/profile-photo',
+  authenticate,
+  authorize(['DOCTOR']),
+  uploadDoctorDocuments.single('profilePhoto'),
+  asyncHandler(doctorController.uploadDoctorProfilePhoto)
 );
 
 router.get(
@@ -155,6 +165,13 @@ router.get(
   doctorReviewsValidator,
   validateRequest,
   asyncHandler(doctorController.getDoctorReviews)
+);
+
+router.get(
+  '/:id/profile-photo',
+  doctorIdValidator,
+  validateRequest,
+  asyncHandler(doctorFileController.getDoctorProfilePhoto)
 );
 
 router.get(

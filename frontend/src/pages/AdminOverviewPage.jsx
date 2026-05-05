@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -16,6 +17,7 @@ const summaryTone = {
 };
 
 function AdminOverviewPage() {
+  const navigate = useNavigate();
   const dashboardQuery = useQuery({
     queryKey: ['admin-dashboard-overview'],
     staleTime: 30 * 1000,
@@ -81,6 +83,8 @@ function AdminOverviewPage() {
   const summary = dashboard.summary || {};
   const activityLog = (dashboard.activityLog || []).slice(0, 5);
   const pendingReviews = (dashboard.reviewQueue || []).slice(0, 3);
+  const quickPatients = (dashboard.accounts || []).filter((item) => item.role === 'PATIENT').slice(0, 6);
+  const quickDoctors = (dashboard.accounts || []).filter((item) => item.role === 'DOCTOR').slice(0, 6);
 
   const summaryCards = [
     { label: 'Médecins vérifiés', value: summary.verifiedDoctors || 0, detail: 'Comptes actifs', tone: 'success' },
@@ -138,6 +142,41 @@ function AdminOverviewPage() {
               </div>
             ))}
             {!pendingReviews.length ? <p className="text-sm text-slate-600">Aucun avis en attente.</p> : null}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="space-y-3">
+          <p className="text-sm font-semibold text-slate-900">Profils patients (cliquables)</p>
+          <div className="space-y-2">
+            {quickPatients.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => navigate(`/dashboard/admin/accounts/${item.id}`)}
+                className="w-full rounded-xl bg-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-100"
+              >
+                <p className="font-semibold text-slate-900">{item.email}</p>
+                <p className="text-xs text-slate-500">{item.patient?.ville || 'Ville non renseignée'}</p>
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card className="space-y-3">
+          <p className="text-sm font-semibold text-slate-900">Profils médecins (cliquables)</p>
+          <div className="space-y-2">
+            {quickDoctors.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => navigate(`/dashboard/admin/accounts/${item.id}`)}
+                className="w-full rounded-xl bg-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-100"
+              >
+                <p className="font-semibold text-slate-900">{item.doctor?.nomComplet || item.email}</p>
+                <p className="text-xs text-slate-500">{item.doctor?.specialite || 'Spécialité non renseignée'}</p>
+              </button>
+            ))}
           </div>
         </Card>
       </div>

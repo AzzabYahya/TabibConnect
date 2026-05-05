@@ -157,7 +157,21 @@ const resetPassword = async (req, res) => {
   });
 };
 
+const changePassword = async (req, res) => {
+  await authService.changePassword({
+    userId: req.user.id,
+    currentPassword: req.body.currentPassword,
+    newPassword: req.body.newPassword,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Password changed successfully',
+  });
+};
+
 module.exports = {
+  changePassword,
   forgotPassword,
   deleteAccount,
   getCurrentUser,

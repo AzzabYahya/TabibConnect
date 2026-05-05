@@ -4,21 +4,27 @@ import {
   Bell,
   LayoutDashboard,
   MessageSquareWarning,
+  HeartPulse,
   Stethoscope,
   Users,
   BadgeCheck,
   BarChart3,
+  FileText,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import DashboardShell from './DashboardShell';
+import { useNotificationSocket } from '../hooks/useNotificationSocket';
 
 function AdminDashboardLayout() {
   const { t } = useTranslation();
+  useNotificationSocket();
   const links = [
     { to: '/dashboard/admin', label: t('dashboard.adminMenu.overview'), icon: LayoutDashboard, end: true },
-    { to: '/dashboard/admin/users', label: t('dashboard.adminMenu.users'), icon: Users },
+    { to: '/dashboard/admin/requests', label: 'Demandes', icon: FileText },
+    { to: '/dashboard/admin/patients', label: 'Patients', icon: HeartPulse },
     { to: '/dashboard/admin/doctors', label: t('dashboard.adminMenu.doctors'), icon: Stethoscope },
+    { to: '/dashboard/admin/users', label: t('dashboard.adminMenu.users'), icon: Users },
     { to: '/dashboard/admin/reviews', label: t('dashboard.adminMenu.pendingReviews'), icon: BadgeCheck },
     { to: '/dashboard/admin/metrics', label: t('dashboard.adminMenu.metrics'), icon: BarChart3 },
     { to: '/dashboard/admin/logs', label: t('dashboard.adminMenu.logs'), icon: Activity },

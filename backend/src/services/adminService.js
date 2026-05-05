@@ -22,6 +22,25 @@ const toDisplayName = (email) => {
     : 'Utilisateur';
 };
 
+const toBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
+  return false;
+};
+
+const toStringList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
 const parseCoordinate = (value, fieldName) => {
   if (value === null || value === undefined || String(value).trim() === '') {
     throw new HttpError(400, `${fieldName} is required`);
@@ -49,6 +68,19 @@ const toStoredDocumentRef = (file) => ({
   size: Number.isFinite(file?.size) ? Number(file.size) : null,
   uploadedAt: file ? new Date() : null,
 });
+
+const getProfilePhotoFromDocuments = (documents = []) => {
+  const images = (documents || []).filter((document) =>
+    String(document.mimeType || '').startsWith('image/')
+  );
+
+  const flagged = images.filter((doc) => Boolean(doc.isProfilePhoto));
+  if (flagged.length) {
+    return flagged.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+  }
+
+  return images.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] || null;
+};
 
 const getAdminDashboard = async () => {
   const [pendingDoctors, pendingReviews, pendingDoctorChanges, totalDoctors, verifiedDoctors, totalPatients, totalAppointments, totalReviews, recentAppointments, recentNotifications, accounts, appointmentLinks] =
@@ -218,6 +250,7 @@ const getAdminDashboard = async () => {
           },
           doctor: {
             select: {
+              id: true,
               nomComplet: true,
               specialite: true,
               inpe: true,
@@ -498,7 +531,20 @@ const getAdminAccountDetails = async ({ userId }) => {
     where: { id: userId },
     include: {
       patient: true,
-      doctor: true,
+      doctor: {
+        include: {
+          documents: {
+            select: {
+              id: true,
+              fileName: true,
+              filePath: true,
+              mimeType: true,
+              size: true,
+              createdAt: true,
+            },
+          },
+        },
+      },
       notifications: {
         orderBy: [{ createdAt: 'desc' }],
         take: 20,
@@ -547,6 +593,8 @@ const getAdminAccountDetails = async ({ userId }) => {
       : [],
   ]);
 
+  const profilePhoto = getProfilePhotoFromDocuments(account.doctor?.documents || []);
+
   return {
     account: {
       id: account.id,
@@ -558,6 +606,14 @@ const getAdminAccountDetails = async ({ userId }) => {
       lastLoginAt: account.lastLoginAt,
       patient: account.patient,
       doctor: account.doctor,
+      profilePhoto: profilePhoto
+        ? {
+            fileName: profilePhoto.fileName,
+            filePath: profilePhoto.filePath,
+            mimeType: profilePhoto.mimeType,
+            uploadedAt: profilePhoto.createdAt,
+          }
+        : null,
     },
     notifications: account.notifications.map((item) => ({
       id: item.id,
@@ -568,6 +624,7 @@ const getAdminAccountDetails = async ({ userId }) => {
     })),
     consultedDoctors: patientAppointments.map((item) => ({
       appointmentId: item.id,
+      doctorUserId: item.doctor?.userId || null,
       doctorName: item.doctor.nomComplet || toDisplayName(item.doctor.user.email),
       specialty: item.doctor.specialite,
       city: item.cabinet?.ville || 'Maroc',
@@ -577,6 +634,7 @@ const getAdminAccountDetails = async ({ userId }) => {
     })),
     consultedPatients: doctorAppointments.map((item) => ({
       appointmentId: item.id,
+      patientUserId: item.patient?.userId || null,
       patientName: toDisplayName(item.patient.user.email),
       city: item.cabinet?.ville || 'Maroc',
       status: item.statut,
@@ -643,11 +701,27 @@ const verifyDoctor = async ({ doctorId }) => {
     where: { id: doctorId },
     include: {
       user: true,
+      documents: {
+        select: {
+          id: true,
+          fileName: true,
+          filePath: true,
+          mimeType: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
   if (!doctor) {
     throw new HttpError(404, 'Doctor not found');
+  }
+  const profilePhoto = getProfilePhotoFromDocuments(doctor.documents);
+  if (!profilePhoto) {
+    throw new HttpError(
+      400,
+      'Doctor profile photo is required before verification. Ask the doctor to upload an image.'
+    );
   }
 
   await prisma.user.update({
@@ -659,6 +733,11 @@ const verifyDoctor = async ({ doctorId }) => {
     id: doctor.id,
     name: doctor.nomComplet || toDisplayName(doctor.user.email),
     verified: true,
+    profilePhoto: {
+      fileName: profilePhoto.fileName,
+      filePath: profilePhoto.filePath,
+      mimeType: profilePhoto.mimeType,
+    },
   };
 };
 
@@ -755,6 +834,35 @@ const approveDoctorChangeRequest = async ({ requestId, adminUserId, reviewNote }
         longitude: data.longitude !== undefined ? parseCoordinate(data.longitude, 'longitude') : undefined,
         phone: data.phone ?? undefined,
       },
+    });
+  } else if (request.type === 'PROFILE_PHOTO_UPDATE') {
+    const documentId = data.documentId;
+    if (!documentId) {
+      throw new HttpError(400, 'documentId is required');
+    }
+
+    const document = await prisma.doctorDocument.findFirst({
+      where: { id: documentId, doctorId: request.doctorId },
+      select: { id: true, mimeType: true },
+    });
+
+    if (!document) {
+      throw new HttpError(400, 'Requested document is not linked to this doctor');
+    }
+
+    if (!String(document.mimeType || '').startsWith('image/')) {
+      throw new HttpError(400, 'Profile photo must be an image');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.doctorDocument.updateMany({
+        where: { doctorId: request.doctorId, isProfilePhoto: true },
+        data: { isProfilePhoto: false },
+      });
+      await tx.doctorDocument.update({
+        where: { id: documentId },
+        data: { isProfilePhoto: true },
+      });
     });
   }
 
@@ -917,12 +1025,23 @@ const clampPagination = ({ page = 1, limit = 20, maxLimit = 50 }) => {
   return { page: safePage, limit: safeLimit, skip };
 };
 
-const getAdminUsers = async ({ page, limit, role = 'ALL', search = '', city = 'ALL', status = 'ALL' }) => {
+const getAdminUsers = async ({
+  page,
+  limit,
+  role = 'ALL',
+  search = '',
+  city = 'ALL',
+  status = 'ALL',
+  sortBy = 'createdAt',
+  sortDir = 'desc',
+}) => {
   const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
   const q = String(search || '').trim();
   const normalizedRole = String(role || 'ALL').toUpperCase();
   const normalizedCity = String(city || 'ALL').trim();
   const normalizedStatus = String(status || 'ALL').toUpperCase();
+  const normalizedSortBy = String(sortBy || 'createdAt');
+  const normalizedSortDir = String(sortDir || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const where = {
     ...(normalizedRole !== 'ALL' ? { role: normalizedRole } : {}),
@@ -956,11 +1075,27 @@ const getAdminUsers = async ({ page, limit, role = 'ALL', search = '', city = 'A
       : {}),
   };
 
+  const orderBy = (() => {
+    switch (normalizedSortBy) {
+      case 'email':
+        return [{ email: normalizedSortDir }];
+      case 'role':
+        return [{ role: normalizedSortDir }, { createdAt: 'desc' }];
+      case 'status':
+        return [{ isVerified: normalizedSortDir }, { createdAt: 'desc' }];
+      case 'name':
+        return [{ doctor: { nomComplet: normalizedSortDir } }, { email: normalizedSortDir }];
+      case 'createdAt':
+      default:
+        return [{ createdAt: normalizedSortDir }];
+    }
+  })();
+
   const [total, items] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
-      orderBy: [{ createdAt: 'desc' }],
+      orderBy,
       skip,
       take: safeLimit,
       include: {
@@ -1099,10 +1234,19 @@ const getAdminMetrics = async () => {
   };
 };
 
-const getAdminDoctors = async ({ page, limit, status = 'ALL', search = '' }) => {
+const getAdminDoctors = async ({
+  page,
+  limit,
+  status = 'ALL',
+  search = '',
+  sortBy = 'createdAt',
+  sortDir = 'desc',
+}) => {
   const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
   const normalizedStatus = String(status || 'ALL').toUpperCase();
   const q = String(search || '').trim();
+  const normalizedSortBy = String(sortBy || 'createdAt');
+  const normalizedSortDir = String(sortDir || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const where = {
     ...(normalizedStatus === 'PENDING' ? { user: { isVerified: false } } : {}),
@@ -1119,11 +1263,23 @@ const getAdminDoctors = async ({ page, limit, status = 'ALL', search = '' }) => 
       : {}),
   };
 
+  const orderBy = (() => {
+    switch (normalizedSortBy) {
+      case 'name':
+        return [{ nomComplet: normalizedSortDir }, { createdAt: 'desc' }];
+      case 'email':
+        return [{ user: { email: normalizedSortDir } }, { createdAt: 'desc' }];
+      case 'createdAt':
+      default:
+        return [{ createdAt: normalizedSortDir }];
+    }
+  })();
+
   const [total, items] = await Promise.all([
     prisma.doctor.count({ where }),
     prisma.doctor.findMany({
       where,
-      orderBy: [{ createdAt: 'desc' }],
+      orderBy,
       skip,
       take: safeLimit,
       include: {
@@ -1174,6 +1330,79 @@ const getAdminDoctors = async ({ page, limit, status = 'ALL', search = '' }) => 
   };
 };
 
+const updateDoctorProfileByAdmin = async ({ doctorId, payload }) => {
+  const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor not found');
+  }
+
+  const data = {};
+
+  if (payload.nomComplet !== undefined) {
+    const trimmed = String(payload.nomComplet || '').trim();
+    data.nomComplet = trimmed ? trimmed : null;
+  }
+
+  if (payload.specialite !== undefined) {
+    data.specialite = requireStringField(payload.specialite, 'specialite');
+  }
+
+  if (payload.diplomes !== undefined) {
+    data.diplomes = toStringList(payload.diplomes);
+  }
+
+  if (payload.languesParlees !== undefined) {
+    data.languesParlees = toStringList(payload.languesParlees);
+  }
+
+  if (payload.tarifConsultation !== undefined) {
+    const parsed = Number(payload.tarifConsultation);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new HttpError(400, 'tarifConsultation must be a positive number');
+    }
+    data.tarifConsultation = new Prisma.Decimal(parsed);
+  }
+
+  if (payload.experience !== undefined) {
+    const parsed = Number(payload.experience);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new HttpError(400, 'experience must be a valid number');
+    }
+    data.experience = Math.round(parsed);
+  }
+
+  if (payload.accepteAssurance !== undefined) {
+    data.accepteAssurance = toBoolean(payload.accepteAssurance);
+  }
+
+  if (payload.assurancesAcceptees !== undefined) {
+    data.assurancesAcceptees = toStringList(payload.assurancesAcceptees);
+  }
+
+  if (payload.bio !== undefined) {
+    const trimmed = String(payload.bio || '').trim();
+    data.bio = trimmed ? trimmed : null;
+  }
+
+  const updated = await prisma.doctor.update({
+    where: { id: doctorId },
+    data,
+  });
+
+  return {
+    id: updated.id,
+    nomComplet: updated.nomComplet,
+    specialite: updated.specialite,
+    tarifConsultation: updated.tarifConsultation,
+    experience: updated.experience,
+    languesParlees: updated.languesParlees || [],
+    diplomes: updated.diplomes || [],
+    accepteAssurance: updated.accepteAssurance,
+    assurancesAcceptees: updated.assurancesAcceptees || [],
+    bio: updated.bio,
+  };
+};
+
 const rejectDoctor = async ({ doctorId, reason }) => {
   const message = String(reason || '').trim();
   if (!message) {
@@ -1199,6 +1428,48 @@ const rejectDoctor = async ({ doctorId, reason }) => {
   await prisma.user.update({ where: { id: doctor.userId }, data: { isVerified: false } });
 
   return { id: doctorId, rejected: true };
+};
+
+const updatePatientProfileByAdmin = async ({ patientId, payload }) => {
+  const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+  if (!patient) {
+    throw new HttpError(404, 'Patient not found');
+  }
+
+  const data = {};
+
+  if (payload.adresse !== undefined) {
+    const trimmed = String(payload.adresse || '').trim();
+    data.adresse = trimmed ? trimmed : null;
+  }
+
+  if (payload.ville !== undefined) {
+    const trimmed = String(payload.ville || '').trim();
+    data.ville = trimmed ? trimmed : null;
+  }
+
+  if (payload.groupeSanguin !== undefined) {
+    const trimmed = String(payload.groupeSanguin || '').trim();
+    data.groupeSanguin = trimmed ? trimmed : null;
+  }
+
+  if (payload.antecedents !== undefined) {
+    const trimmed = String(payload.antecedents || '').trim();
+    data.antecedents = trimmed ? trimmed : null;
+  }
+
+  const updated = await prisma.patient.update({
+    where: { id: patientId },
+    data,
+  });
+
+  return {
+    id: updated.id,
+    adresse: updated.adresse,
+    ville: updated.ville,
+    groupeSanguin: updated.groupeSanguin,
+    antecedents: updated.antecedents,
+  };
 };
 
 const getAdminReviews = async ({ page, limit, status = 'PENDING', search = '' }) => {
@@ -1350,6 +1621,37 @@ const disableUser = async ({ userId }) => {
   return { id: userId, disabled: true };
 };
 
+const deleteUser = async ({ userId }) => {
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      doctor: { select: { id: true } },
+      patient: { select: { id: true } },
+    },
+  });
+
+  if (!account) {
+    throw new HttpError(404, 'Account not found');
+  }
+
+  if (account.doctor) {
+    const hasAppointments = await prisma.rendezVous.count({ where: { doctorId: account.doctor.id } });
+    if (hasAppointments > 0) {
+      throw new HttpError(400, 'Cannot delete a doctor with appointments. Disable the account instead.');
+    }
+  }
+
+  if (account.patient) {
+    const hasAppointments = await prisma.rendezVous.count({ where: { patientId: account.patient.id } });
+    if (hasAppointments > 0) {
+      throw new HttpError(400, 'Cannot delete a patient with appointments. Disable the account instead.');
+    }
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+  return { id: userId, deleted: true };
+};
+
 module.exports = {
   getAdminDashboard,
   getAdminAccountDetails,
@@ -1363,10 +1665,13 @@ module.exports = {
   getAdminLogs,
   getAdminMetrics,
   getAdminDoctors,
+  updateDoctorProfileByAdmin,
+  updatePatientProfileByAdmin,
   rejectDoctor,
   getAdminReviews,
   rejectReview,
   getAdminNotifications,
   markNotificationsRead,
   disableUser,
+  deleteUser,
 };

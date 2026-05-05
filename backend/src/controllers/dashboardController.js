@@ -184,6 +184,8 @@ const getAdminUsers = async (req, res) => {
     search: req.query.search,
     city: req.query.city,
     status: req.query.status,
+    sortBy: req.query.sortBy,
+    sortDir: req.query.sortDir,
   });
   res.status(200).json({ status: 'success', data: payload });
 };
@@ -208,6 +210,16 @@ const getAdminDoctors = async (req, res) => {
     limit: req.query.limit,
     status: req.query.status,
     search: req.query.search,
+    sortBy: req.query.sortBy,
+    sortDir: req.query.sortDir,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const updateDoctorProfileByAdmin = async (req, res) => {
+  const payload = await adminService.updateDoctorProfileByAdmin({
+    doctorId: req.params.doctorId,
+    payload: req.body,
   });
   res.status(200).json({ status: 'success', data: payload });
 };
@@ -216,6 +228,14 @@ const rejectDoctor = async (req, res) => {
   const payload = await adminService.rejectDoctor({
     doctorId: req.params.doctorId,
     reason: req.body.reason,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const updatePatientProfileByAdmin = async (req, res) => {
+  const payload = await adminService.updatePatientProfileByAdmin({
+    patientId: req.params.patientId,
+    payload: req.body,
   });
   res.status(200).json({ status: 'success', data: payload });
 };
@@ -258,11 +278,22 @@ const disableUser = async (req, res) => {
   res.status(200).json({ status: 'success', data: payload });
 };
 
+const deleteUser = async (req, res) => {
+  const payload = await adminService.deleteUser({ userId: req.params.userId });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const getPatientProfileManagement = async (req, res) => {
+  const data = await dashboardService.getPatientProfileManagement({ userId: req.user.id });
+  res.status(200).json({ status: 'success', data });
+};
+
 module.exports = {
   getAdminDashboard,
   getAdminAccountDetails,
   getDoctorDashboard,
   getPatientDashboard,
+  getPatientProfileManagement,
   getPatientHistory,
   getPatientRecurringDoctors,
   getPatientNotifications,
@@ -282,10 +313,13 @@ module.exports = {
   getAdminLogs,
   getAdminMetrics,
   getAdminDoctors,
+  updateDoctorProfileByAdmin,
+  updatePatientProfileByAdmin,
   rejectDoctor,
   getAdminReviews,
   rejectReview,
   getAdminNotifications,
   markNotificationsRead,
   disableUser,
+  deleteUser,
 };

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 function getInitials(name = '') {
   return name
     .split(' ')
@@ -8,20 +10,25 @@ function getInitials(name = '') {
 }
 
 function Avatar({ src, alt, name = '', size = 'md' }) {
+  const [hasError, setHasError] = useState(false);
   const sizeClassName = {
     sm: 'h-8 w-8 text-xs',
     md: 'h-11 w-11 text-sm',
     lg: 'h-14 w-14 text-base',
-    xl: 'h-[52px] w-[52px] text-lg',
+    xl: 'h-24 w-24 text-2xl',
+    '2xl': 'h-44 w-44 text-5xl',
   };
 
   const classes = sizeClassName[size] || sizeClassName.md;
 
-  if (src) {
+  if (src && !hasError) {
     return (
       <img
         src={src}
         alt={alt || name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setHasError(true)}
         className={`${classes} rounded-full object-cover ring-2 ring-med-primary/20`}
       />
     );

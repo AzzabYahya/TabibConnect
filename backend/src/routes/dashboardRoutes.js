@@ -14,6 +14,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/patient', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientDashboard));
+router.get('/patient/profile-management', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientProfileManagement));
 router.get('/patient/history', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientHistory));
 router.get('/patient/recurring-doctors', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientRecurringDoctors));
 router.get('/patient/notifications', authorize(['PATIENT']), asyncHandler(dashboardController.getPatientNotifications));

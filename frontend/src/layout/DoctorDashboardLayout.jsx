@@ -17,6 +17,9 @@ function DoctorDashboardLayout() {
 
   return (
     <DashboardShell subtitle={t('dashboard.doctorSubtitle')}>
+      <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Message administrateur: la photo de profil médecin est obligatoire. Toute nouvelle photo doit être validée par l'admin.
+      </div>
       <div className="sticky top-0 z-10 mb-4 overflow-x-auto rounded-2xl bg-white p-2 shadow">
         <div className="flex gap-2">
           {tabs.map((tab) => (

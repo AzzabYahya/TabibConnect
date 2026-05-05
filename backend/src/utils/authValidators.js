@@ -67,7 +67,13 @@ const verifyEmailValidator = [
   param('token').isString().isLength({ min: 20, max: 200 }),
 ];
 
+const changePasswordValidator = [
+  body('currentPassword').isString().notEmpty().withMessage('Current password is required'),
+  strongPasswordRules,
+];
+
 module.exports = {
+  changePasswordValidator,
   deleteAccountValidator,
   forgotPasswordValidator,
   loginValidator,

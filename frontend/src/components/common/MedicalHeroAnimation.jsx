@@ -3,9 +3,9 @@ function MedicalHeroAnimation() {
     <div className="absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(1200px_220px_at_15%_10%,#1f6f8b_0%,#143246_35%,#0f1923_70%)]" />
       <div className="absolute inset-0 opacity-45">
-        <div className="absolute -left-10 top-3 h-44 w-44 rounded-full border border-cyan-200/30 shadow-[0_0_60px_rgba(34,211,238,0.4)] animate-[ring_7s_ease-in-out_infinite]" />
-        <div className="absolute left-[30%] top-7 h-28 w-28 rounded-full border border-emerald-200/30 shadow-[0_0_50px_rgba(16,185,129,0.3)] animate-[ring_6s_ease-in-out_infinite_0.8s]" />
-        <div className="absolute right-10 top-4 h-40 w-40 rounded-full border border-sky-200/25 shadow-[0_0_60px_rgba(56,189,248,0.35)] animate-[ring_8s_ease-in-out_infinite_0.5s]" />
+        <div className="absolute -left-10 top-3 h-44 w-44 rounded-full ring-2 ring-cyan-300/40 shadow-[0_0_60px_rgba(34,211,238,0.4)] animate-[ring_7s_ease-in-out_infinite]" />
+        <div className="absolute left-[30%] top-7 h-28 w-28 rounded-full ring-2 ring-emerald-300/40 shadow-[0_0_50px_rgba(16,185,129,0.3)] animate-[ring_6s_ease-in-out_infinite_0.8s]" />
+        <div className="absolute right-10 top-4 h-40 w-40 rounded-full ring-2 ring-sky-300/35 shadow-[0_0_60px_rgba(56,189,248,0.35)] animate-[ring_8s_ease-in-out_infinite_0.5s]" />
       </div>
 
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1400 160" preserveAspectRatio="none">

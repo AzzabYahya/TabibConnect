@@ -59,6 +59,19 @@ th {
   word-break: break-word;
 }
 
+.tc-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tc-table th,
+.tc-table td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .leaflet-container {
   font-family: var(--font-latin);
 }

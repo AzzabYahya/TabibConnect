@@ -12,6 +12,7 @@ import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
+import { useNotificationSocket } from '../hooks/useNotificationSocket';
 
 const statusColor = {
   EN_ATTENTE: 'warning',
@@ -31,6 +32,7 @@ const notificationTone = {
 
 function DashboardPatientPage() {
   const navigate = useNavigate();
+  useNotificationSocket();
   const [historyPage, setHistoryPage] = useState(1);
   const [historyStatus, setHistoryStatus] = useState('ALL');
   const [notificationsPage, setNotificationsPage] = useState(1);

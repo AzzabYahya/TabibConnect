@@ -77,7 +77,11 @@ const enrichDoctor = (doctor, ratingSummary) => {
 };
 
 const listDoctors = async (filters) => {
-  const where = {};
+  const where = {
+    user: {
+      isVerified: true,
+    },
+  };
 
   if (filters.q) {
     where.OR = [
@@ -169,8 +173,38 @@ const listDoctors = async (filters) => {
     orderBy: [{ createdAt: 'desc' }],
   });
 
+  const doctorIds = doctors.map((doctor) => doctor.id);
+  const profilePhotos = await prisma.doctorDocument.findMany({
+    where: {
+      doctorId: { in: doctorIds },
+      mimeType: { startsWith: 'image/' },
+    },
+    select: {
+      id: true,
+      doctorId: true,
+      isProfilePhoto: true,
+      createdAt: true,
+    },
+    orderBy: [{ doctorId: 'asc' }, { isProfilePhoto: 'desc' }, { createdAt: 'desc' }],
+  });
+
+  const profilePhotoByDoctorId = new Map();
+  for (const doc of profilePhotos) {
+    if (!profilePhotoByDoctorId.has(doc.doctorId)) {
+      profilePhotoByDoctorId.set(doc.doctorId, doc);
+    }
+  }
+
   const ratingSummary = await getDoctorRatingSummary(doctors.map((doctor) => doctor.id));
-  let results = doctors.map((doctor) => enrichDoctor(doctor, ratingSummary));
+  let results = doctors.map((doctor) => {
+    const enriched = enrichDoctor(doctor, ratingSummary);
+    const profilePhoto = profilePhotoByDoctorId.get(doctor.id);
+
+    return {
+      ...enriched,
+      profilePhotoUrl: profilePhoto ? `/doctors/${doctor.id}/profile-photo?v=${profilePhoto.id}` : null,
+    };
+  });
 
   if (filters.minNote !== undefined) {
     const minNote = Number(filters.minNote);
@@ -218,6 +252,7 @@ const getDoctorProfile = async (doctorId) => {
           filePath: true,
           mimeType: true,
           size: true,
+          isProfilePhoto: true,
           createdAt: true,
         },
       },
@@ -238,6 +273,9 @@ const getDoctorProfile = async (doctorId) => {
   if (!doctor) {
     throw new HttpError(404, 'Doctor not found');
   }
+  if (!doctor.user?.isVerified) {
+    throw new HttpError(404, 'Doctor not found');
+  }
 
   const ratingSummary = await getDoctorRatingSummary([doctor.id]);
   const enrichedDoctor = enrichDoctor(doctor, ratingSummary);
@@ -245,10 +283,25 @@ const getDoctorProfile = async (doctorId) => {
     new Set((enrichedDoctor.disponibilites || []).filter((disponibilite) => disponibilite.isActive).map((disponibilite) => disponibilite.jourSemaine))
   );
   const { disponibilites, ...doctorWithoutSchedule } = enrichedDoctor;
+  const profilePhoto =
+    (doctorWithoutSchedule.documents || []).find((doc) => doc.isProfilePhoto)
+    || (doctorWithoutSchedule.documents || []).find((doc) => String(doc.mimeType || '').startsWith('image/'))
+    || null;
 
   return {
     ...doctorWithoutSchedule,
     availabilityDays,
+    profilePhoto: profilePhoto
+      ? {
+          id: profilePhoto.id,
+          fileName: profilePhoto.fileName,
+          filePath: profilePhoto.filePath,
+          mimeType: profilePhoto.mimeType,
+        }
+      : null,
+    profilePhotoUrl: profilePhoto
+      ? `/doctors/${doctorId}/profile-photo?v=${profilePhoto.id}`
+      : null,
   };
 };
 
@@ -301,6 +354,7 @@ const searchDoctors = async (query) => {
         coalesce(u.email, '')
       )
     ) @@ plainto_tsquery('simple', ${normalizedQuery})
+    AND u."isVerified" = true
     ORDER BY rank DESC
     LIMIT 25
   `;
@@ -426,6 +480,54 @@ const updateDoctorProfile = async ({ userId, payload }) => {
   return {
     ...updated,
     tarifConsultation: Number(updated.tarifConsultation),
+  };
+};
+
+const uploadDoctorProfilePhoto = async ({ userId, file }) => {
+  if (!file || !String(file.mimetype || '').startsWith('image/')) {
+    throw new HttpError(400, 'A valid profile image is required');
+  }
+
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true, userId: true },
+  });
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  const createdDocument = await prisma.doctorDocument.create({
+    data: {
+      doctorId: doctor.id,
+      fileName: file.originalname,
+      filePath: file.path,
+      mimeType: file.mimetype,
+      size: file.size,
+      isProfilePhoto: false,
+    },
+  });
+
+  await prisma.$transaction([
+    prisma.doctorChangeRequest.create({
+      data: {
+        doctorId: doctor.id,
+        type: 'PROFILE_PHOTO_UPDATE',
+        reason: 'Changement photo de profil (validation admin requise)',
+        payload: {
+          documentId: createdDocument.id,
+          fileName: createdDocument.fileName,
+          mimeType: createdDocument.mimeType,
+          size: createdDocument.size,
+          uploadedAt: new Date().toISOString(),
+        },
+      },
+    }),
+  ]);
+
+  return {
+    uploaded: true,
+    requiresAdminValidation: true,
+    documentId: createdDocument.id,
   };
 };
 
@@ -1058,6 +1160,7 @@ module.exports = {
   updateDoctorChangeRequest,
   cancelDoctorChangeRequest,
   updateDoctorProfile,
+  uploadDoctorProfilePhoto,
   getDoctorAgenda,
   listDoctorPatients,
   getDoctorReceivedReviews,

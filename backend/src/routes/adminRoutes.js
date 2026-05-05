@@ -2,6 +2,7 @@ const express = require('express');
 const { body, query, param } = require('express-validator');
 
 const dashboardController = require('../controllers/dashboardController');
+const adminFileController = require('../controllers/adminFileController');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const asyncHandler = require('../utils/asyncHandler');
@@ -20,6 +21,8 @@ router.get(
   query('search').optional().isString(),
   query('city').optional().isString(),
   query('status').optional().isIn(['ALL', 'ACTIVE', 'INACTIVE']),
+  query('sortBy').optional().isIn(['createdAt', 'email', 'role', 'status', 'name']),
+  query('sortDir').optional().isIn(['asc', 'desc']),
   validateRequest,
   asyncHandler(dashboardController.getAdminUsers)
 );
@@ -41,8 +44,26 @@ router.get(
   query('limit').optional().isInt({ min: 1, max: 50 }),
   query('status').optional().isIn(['ALL', 'PENDING', 'VERIFIED']),
   query('search').optional().isString(),
+  query('sortBy').optional().isIn(['createdAt', 'name', 'email']),
+  query('sortDir').optional().isIn(['asc', 'desc']),
   validateRequest,
   asyncHandler(dashboardController.getAdminDoctors)
+);
+
+router.put(
+  '/doctors/:doctorId/profile',
+  param('doctorId').isString().isLength({ min: 10, max: 40 }),
+  body('nomComplet').optional().isString().isLength({ min: 2, max: 120 }),
+  body('specialite').optional().isString().isLength({ min: 2, max: 120 }),
+  body('diplomes').optional().custom((value) => Array.isArray(value) || typeof value === 'string'),
+  body('languesParlees').optional().custom((value) => Array.isArray(value) || typeof value === 'string'),
+  body('tarifConsultation').optional().isFloat({ gt: 0, max: 10000 }),
+  body('experience').optional().isInt({ min: 0, max: 80 }),
+  body('accepteAssurance').optional().isBoolean(),
+  body('assurancesAcceptees').optional().custom((value) => Array.isArray(value) || typeof value === 'string'),
+  body('bio').optional().isString().isLength({ max: 5000 }),
+  validateRequest,
+  asyncHandler(dashboardController.updateDoctorProfileByAdmin)
 );
 
 router.post(
@@ -58,6 +79,17 @@ router.post(
   body('reason').isString().isLength({ min: 3, max: 500 }),
   validateRequest,
   asyncHandler(dashboardController.rejectDoctor)
+);
+
+router.post(
+  '/patients/:patientId/profile',
+  param('patientId').isString().isLength({ min: 10, max: 40 }),
+  body('adresse').optional().isString().trim(),
+  body('ville').optional().isString().trim(),
+  body('groupeSanguin').optional().isString().trim(),
+  body('antecedents').optional().isString().trim(),
+  validateRequest,
+  asyncHandler(dashboardController.updatePatientProfileByAdmin)
 );
 
 router.get(
@@ -95,6 +127,14 @@ router.get(
   asyncHandler(dashboardController.getAdminNotifications)
 );
 
+router.get(
+  '/doctors/:doctorId/documents/:documentId',
+  param('doctorId').isString().isLength({ min: 10, max: 40 }),
+  param('documentId').isString().isLength({ min: 10, max: 40 }),
+  validateRequest,
+  asyncHandler(adminFileController.getDoctorDocument)
+);
+
 router.post(
   '/notifications/mark-read',
   body('ids').isArray({ min: 1 }),
@@ -108,6 +148,13 @@ router.post(
   param('userId').isString().isLength({ min: 10, max: 40 }),
   validateRequest,
   asyncHandler(dashboardController.disableUser)
+);
+
+router.delete(
+  '/users/:userId',
+  param('userId').isString().isLength({ min: 10, max: 40 }),
+  validateRequest,
+  asyncHandler(dashboardController.deleteUser)
 );
 
 router.get(
