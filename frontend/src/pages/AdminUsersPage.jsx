@@ -9,6 +9,8 @@ import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
+import AdminDocumentViewer from '../components/admin/AdminDocumentViewer';
+
 
 function AdminUsersPage() {
   const [page, setPage] = useState(1);
@@ -216,6 +218,13 @@ function AdminUsersPage() {
                   <p className="text-sm text-slate-700">Spécialité: {selectedDetailQuery.data.account.doctor.specialite || 'N/A'}</p>
                   <p className="text-sm text-slate-700">INPE: {selectedDetailQuery.data.account.doctor.inpe || 'N/A'}</p>
                   <p className="text-sm text-slate-700">Expérience: {selectedDetailQuery.data.account.doctor.experience ?? 'N/A'} ans</p>
+
+                  <div className="mt-2">
+                    <AdminDocumentViewer
+                      endpoint={`/admin/users/${selectedDetailQuery.data.account.id}/cin`}
+                      title="Carte Nationale (CIN)"
+                    />
+                  </div>
                 </Card>
               ) : null}
 
@@ -224,8 +233,16 @@ function AdminUsersPage() {
                   <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><UsersRound size={14} /> Profil patient</p>
                   <p className="text-sm text-slate-700">Ville: {selectedDetailQuery.data.account.patient.ville || 'N/A'}</p>
                   <p className="text-sm text-slate-700">CIN: {selectedDetailQuery.data.account.patient.cin || 'N/A'}</p>
+
+                  <div className="mt-2">
+                    <AdminDocumentViewer
+                      endpoint={`/admin/users/${selectedDetailQuery.data.account.id}/cin`}
+                      title="Carte Nationale (CIN)"
+                    />
+                  </div>
                 </Card>
               ) : null}
+
 
               <Card className="space-y-2">
                 <p className="text-sm font-semibold text-slate-900">Derniers patients du médecin</p>
@@ -282,6 +299,10 @@ function AdminUsersPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default AdminUsersPage;
   );
 }
 

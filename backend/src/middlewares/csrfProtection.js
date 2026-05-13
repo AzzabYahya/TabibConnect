@@ -9,10 +9,16 @@ const {
 } = doubleCsrf({
   getSecret: () => env.csrfSecret,
   getSessionIdentifier: (req) => {
+    // If the user is authenticated, use their ID for a stable CSRF session.
+    // Otherwise, fallback to UA + IP for unauthenticated flows.
+    if (req.user && req.user.id) {
+      return req.user.id;
+    }
     const userAgent = req.headers['user-agent'] || 'unknown-agent';
     const ip = req.ip || 'unknown-ip';
     return `${userAgent}:${ip}`;
   },
+
   cookieName: env.csrfCookieName,
   cookieOptions: {
     secure: env.nodeEnv === 'production',

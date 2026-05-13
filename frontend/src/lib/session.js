@@ -9,9 +9,9 @@ export const getStoredAccessToken = () => {
   if (!isBrowser()) {
     return null;
   }
-
-  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  return window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
 };
+
 
 export const getStoredUser = () => {
   if (!isBrowser()) {
@@ -36,16 +36,14 @@ export const getStoredCsrfToken = () => {
 };
 
 export const storeSession = ({ accessToken, user }) => {
-  if (!isBrowser()) {
-    return;
-  }
+  if (isBrowser()) {
+    if (accessToken) {
+      window.sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    }
 
-  if (accessToken) {
-    window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  }
-
-  if (user) {
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (user) {
+      window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
   }
 
   window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
@@ -56,14 +54,15 @@ export const storeCsrfToken = (csrfToken) => {
 };
 
 export const clearSession = () => {
-  if (!isBrowser()) {
-    return;
+  if (isBrowser()) {
+    window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.localStorage.removeItem(USER_KEY);
   }
 
-  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event(SESSION_CHANGE_EVENT));
 };
+
+
 
 export const clearCsrfToken = () => {
   inMemoryCsrfToken = null;

@@ -50,7 +50,7 @@ const listPendingPatientChangeRequests = async ({ page = 1, limit = 20 }) => {
   const [items, total] = await Promise.all([
     prisma.patientChangeRequest.findMany({
       where: { status: 'PENDING' },
-      include: { patient: { include: { user: { select: { email: true } } } } },
+      include: { patient: { include: { user: { select: { email: true, id: true } } } } },
       orderBy: [{ createdAt: 'asc' }],
       skip: (currentPage - 1) * pageSize,
       take: pageSize,
@@ -62,6 +62,7 @@ const listPendingPatientChangeRequests = async ({ page = 1, limit = 20 }) => {
     items: items.map((r) => ({
       id: r.id,
       patientId: r.patientId,
+      userId: r.patient?.user?.id || null,
       patientEmail: r.patient?.user?.email || null,
       reason: r.reason,
       payload: r.payload,
@@ -92,15 +93,38 @@ const approvePatientChangeRequest = async ({ requestId, adminUserId, reviewNote 
   }
 
   const data = request.payload || {};
-  await prisma.patient.update({
-    where: { id: request.patientId },
-    data: {
-      adresse: data.adresse ?? undefined,
-      ville: data.ville ?? undefined,
-      groupeSanguin: data.groupeSanguin ?? undefined,
-      antecedents: data.antecedents ?? undefined,
-    },
+  
+  await prisma.$transaction(async (tx) => {
+    // 1. Update text fields if present
+    const profileUpdate = {};
+    if (data.adresse !== undefined) profileUpdate.adresse = data.adresse;
+    if (data.ville !== undefined) profileUpdate.ville = data.ville;
+    if (data.groupeSanguin !== undefined) profileUpdate.groupeSanguin = data.groupeSanguin;
+    if (data.antecedents !== undefined) profileUpdate.antecedents = data.antecedents;
+
+    if (Object.keys(profileUpdate).length > 0) {
+      await tx.patient.update({
+        where: { id: request.patientId },
+        data: profileUpdate,
+      });
+    }
+
+    // 2. Update profile photo if a documentId is provided
+    if (data.documentId) {
+      // Deactivate current profile photo
+      await tx.patientDocument.updateMany({
+        where: { patientId: request.patientId, isProfilePhoto: true },
+        data: { isProfilePhoto: false },
+      });
+
+      // Activate new profile photo
+      await tx.patientDocument.update({
+        where: { id: data.documentId },
+        data: { isProfilePhoto: true },
+      });
+    }
   });
+
 
   return prisma.patientChangeRequest.update({
     where: { id: requestId },

@@ -12,6 +12,8 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
+import AdminDocumentViewer from '../components/admin/AdminDocumentViewer';
+
 
 const roleTone = {
   ADMIN: 'info',
@@ -120,6 +122,19 @@ function UserProfilePage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Suppression impossible.'),
   });
 
+  const updateProfilePhotoMutation = useMutation({
+    mutationFn: async (file) => {
+      const formData = new FormData();
+      formData.append('profilePhoto', file);
+      return api.post(`/admin/users/${userId}/profile-photo`, formData);
+    },
+    onSuccess: async () => {
+      toast.success('Photo mise à jour.');
+      await profileQuery.refetch();
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || 'Mise à jour photo impossible.'),
+  });
+
   const data = profileQuery.data || {};
   const account = data.account || {};
   const isDoctor = account.role === 'DOCTOR';
@@ -149,7 +164,7 @@ function UserProfilePage() {
   };
   const avatarUrl = isDoctor
     ? resolveImageUrl(data.doctor?.profilePhotoUrl, data.doctor)
-    : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=256&q=80';
+    : resolveImageUrl(data.patient?.profilePhotoUrl, { nomComplet: account.displayName || account.email });
 
   const consultedDoctors = Array.isArray(data.consultedDoctors) ? data.consultedDoctors : [];
   const consultedPatients = Array.isArray(data.consultedPatients) ? data.consultedPatients : [];
@@ -234,8 +249,23 @@ function UserProfilePage() {
         <div className="-mt-10 space-y-4 px-5 pb-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex items-end gap-3">
-              <div className="rounded-3xl border border-white/70 bg-white p-1 shadow-lg">
+              <div className="group relative rounded-3xl border border-white/70 bg-white p-1 shadow-lg">
                 <Avatar src={avatarUrl} name={account.displayName || account.email} size="lg" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <input
+                    type="file"
+                    id="admin-photo-upload"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) updateProfilePhotoMutation.mutate(file);
+                    }}
+                  />
+                  <label htmlFor="admin-photo-upload" className="cursor-pointer text-[10px] font-bold text-white uppercase tracking-widest text-center px-1">
+                    Changer
+                  </label>
+                </div>
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-2xl font-black tracking-tight text-slate-900">
@@ -308,7 +338,7 @@ function UserProfilePage() {
               Voir le profil public
             </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl bg-slate-50/90 p-3 text-sm text-slate-700">
               <p className="text-xs uppercase tracking-wide text-slate-500">Spécialité</p>
               <p className="mt-1 font-semibold text-slate-900">{data.doctor.specialite || '—'}</p>
@@ -317,9 +347,17 @@ function UserProfilePage() {
               <p className="text-xs uppercase tracking-wide text-slate-500">Expérience</p>
               <p className="mt-1 font-semibold text-slate-900">{Number.isFinite(data.doctor.experience) ? `${data.doctor.experience} ans` : '—'}</p>
             </div>
+            <div className="rounded-2xl bg-white p-2 border border-slate-100 shadow-sm md:col-span-2 lg:col-span-1">
+              <AdminDocumentViewer
+                endpoint={`/admin/users/${account.id}/cin`}
+                title="Carte Nationale (CIN)"
+                className="!h-32"
+              />
+            </div>
           </div>
           {data.doctor.bio ? <p className="text-sm text-slate-700">{data.doctor.bio}</p> : null}
         </Card>
+
       ) : null}
 
       {isPatient && data.patient ? (
@@ -327,7 +365,15 @@ function UserProfilePage() {
           <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
             <UsersRound size={16} className="text-med-primary" /> Profil patient
           </p>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => disableUserMutation.mutate()} disabled={disableUserMutation.isPending}>
+              Désactiver accès
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} disabled={deleteUserMutation.isPending}>
+              Supprimer compte
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl bg-slate-50/90 p-3 text-sm">
               <p className="text-xs uppercase tracking-wide text-slate-500">Ville</p>
               <p className="mt-1 font-semibold text-slate-900">{data.patient.ville || '—'}</p>
@@ -340,7 +386,15 @@ function UserProfilePage() {
               <p className="text-xs uppercase tracking-wide text-slate-500">Naissance</p>
               <p className="mt-1 font-semibold text-slate-900">{formatDate(data.patient.dateOfNaissance)}</p>
             </div>
+            <div className="rounded-2xl bg-white p-2 border border-slate-100 shadow-sm md:col-span-2 lg:col-span-1">
+              <AdminDocumentViewer
+                endpoint={`/admin/users/${account.id}/cin`}
+                title="Carte Nationale (CIN)"
+                className="!h-32"
+              />
+            </div>
           </div>
+
           {data.patient.antecedents ? <p className="text-sm text-slate-700">{data.patient.antecedents}</p> : null}
         </Card>
       ) : null}

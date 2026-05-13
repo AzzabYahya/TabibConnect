@@ -78,19 +78,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(doubleCsrfProtection);
 app.use(sanitizeInputs);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/home', homeRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/doctors', doctorRoutes);
-app.use('/api/cabinets', cabinetRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/patients', patientRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/home', homeRoutes);
+app.use('/api/v1/appointments', appointmentRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/doctors', doctorRoutes);
+app.use('/api/v1/cabinets', cabinetRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/patients', patientRoutes);
 
-app.use('/api', healthRoutes);
+app.use('/api/v1', healthRoutes);
+
 
 app.use((req, res, next) => {
   const error = new Error('Route not found');

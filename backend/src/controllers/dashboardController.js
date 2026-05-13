@@ -318,8 +318,28 @@ const getPatientProfileManagement = async (req, res) => {
   const data = await dashboardService.getPatientProfileManagement({ userId: req.user.id });
   res.status(200).json({ status: 'success', data });
 };
+const getAdminAppointments = async (req, res) => {
+  const payload = await adminService.getAdminAppointments({
+    page: req.query.page,
+    limit: req.query.limit,
+    status: req.query.status,
+    search: req.query.search,
+  });
+  res.status(200).json({ status: 'success', data: payload });
+};
+
+const updateProfilePhotoByAdmin = async (req, res) => {
+  const data = await adminService.updateProfilePhotoByAdmin({
+    userId: req.params.userId,
+    file: req.file,
+  });
+  res.status(200).json({ status: 'success', data });
+};
 
 module.exports = {
+  updateProfilePhotoByAdmin,
+  getAdminAppointments,
+
   getAdminDashboard,
   getAdminAccountDetails,
   getDoctorDashboard,

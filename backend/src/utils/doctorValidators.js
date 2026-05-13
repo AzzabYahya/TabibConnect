@@ -1,19 +1,32 @@
 const { body, param, query } = require('express-validator');
 
 const doctorListValidator = [
-  query('q').optional().trim().isLength({ min: 2, max: 120 }),
-  query('specialite').optional().trim().isLength({ min: 2, max: 120 }),
-  query('ville').optional().trim().isLength({ min: 2, max: 120 }),
+  query('q').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+  query('specialite').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+  query('ville').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
   query('availableToday').optional().isBoolean().toBoolean(),
   query('accepteAssurance').optional().isBoolean().toBoolean(),
   query('minNote').optional().isFloat({ min: 0, max: 5 }),
   query('maxTarif').optional().isFloat({ min: 0 }),
   query('langue').optional().trim().isLength({ min: 2, max: 50 }),
+  query('videoOnly').optional().isBoolean().toBoolean(),
+  query('sexe').optional().isIn(['TOUT', 'HOMME', 'FEMME']),
 ];
 
 const doctorIdValidator = [param('id').isString().isLength({ min: 10, max: 40 })];
 
-const doctorSearchValidator = [query('q').trim().isLength({ min: 2, max: 120 })];
+const doctorSearchValidator = [
+  query('q').trim().isLength({ min: 2, max: 120 }),
+  query('specialite').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+  query('ville').optional({ checkFalsy: true }).trim().isLength({ min: 2, max: 120 }),
+  query('maxTarif').optional().isFloat({ min: 0 }),
+  query('minNote').optional().isFloat({ min: 0, max: 5 }),
+  query('accepteAssurance').optional().isBoolean().toBoolean(),
+  query('videoOnly').optional().isBoolean().toBoolean(),
+  query('sexe').optional().isIn(['TOUT', 'HOMME', 'FEMME']),
+];
+
+
 
 const doctorUpdateProfileValidator = [
   body('nomComplet').optional().trim().isLength({ min: 3, max: 150 }).escape(),

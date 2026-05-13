@@ -30,6 +30,8 @@ const adminMetricsPageLoader = lazy(() => import('../pages/AdminMetricsPage'));
 const adminLogsPageLoader = lazy(() => import('../pages/AdminLogsPage'));
 const adminNotificationsPageLoader = lazy(() => import('../pages/AdminNotificationsPage'));
 const adminRequestsPageLoader = lazy(() => import('../pages/AdminRequestsPage'));
+const adminAppointmentsPageLoader = lazy(() => import('../pages/AdminAppointmentsPage'));
+
 
 const doctorAgendaPageLoader = lazy(() => import('../pages/DoctorAgendaPage'));
 const doctorAvailabilityPageLoader = lazy(() => import('../pages/DoctorAvailabilityPage'));
@@ -182,7 +184,12 @@ const router = createBrowserRouter([
             path: 'notifications',
             element: withRouteSuspense(createElement(adminNotificationsPageLoader)),
           },
+          {
+            path: 'appointments',
+            element: withRouteSuspense(createElement(adminAppointmentsPageLoader)),
+          },
         ],
+
       },
       {
         path: 'dashboard/admin/accounts/:userId',

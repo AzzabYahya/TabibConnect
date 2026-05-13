@@ -164,7 +164,7 @@ const registerPatient = async (payload, cinDocumentFile) => {
       password: hashedPassword,
       phone: payload.phone,
       role: 'PATIENT',
-      isVerified: false,
+      isVerified: env.nodeEnv !== 'production' && !env.smtpHost,
       emailVerificationTokenHash: verificationTokenHash,
       emailVerificationExpiresAt: verificationTokenExpiresAt,
       patient: {
@@ -265,7 +265,7 @@ const registerDoctor = async (payload, files = [], cinDocumentFile = null) => {
       password: hashedPassword,
       phone: payload.phone,
       role: 'DOCTOR',
-      isVerified: false,
+      isVerified: env.nodeEnv !== 'production' && !env.smtpHost,
       emailVerificationTokenHash: verificationTokenHash,
       emailVerificationExpiresAt: verificationTokenExpiresAt,
       doctor: {
@@ -397,24 +397,30 @@ const deleteAccount = async ({ userId, reason, reasonDetail, acceptDeletionTerms
   const patientId = user.patient?.id || null;
   const doctorId = user.doctor?.id || null;
 
-  await prisma.$transaction(async (transaction) => {
-    if (patientId) {
-      await transaction.rendezVous.deleteMany({
-        where: { patientId },
-      });
-    }
-
-    if (doctorId) {
-      await transaction.rendezVous.deleteMany({
-        where: { doctorId },
-      });
-    }
-
-    await transaction.user.delete({
-      where: { id: userId },
-    });
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      deletedAt: new Date(),
+      refreshTokenHash: null,
+      refreshTokenExpiresAt: null,
+    },
   });
+
+  if (patientId) {
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  if (doctorId) {
+    await prisma.doctor.update({
+      where: { id: doctorId },
+      data: { deletedAt: new Date() },
+    });
+  }
 };
+
 
 const refreshToken = async ({ refreshTokenValue }) => {
   let payload;

@@ -7,7 +7,11 @@ const { getTokenFromAuthorizationHeader } = require('../utils/tokenUtils');
 
 const authenticate = async (req, res, next) => {
   try {
-    const token = getTokenFromAuthorizationHeader(req.headers.authorization);
+    let token = getTokenFromAuthorizationHeader(req.headers.authorization);
+
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
 
     if (!token) {
       throw new HttpError(401, 'Authentication token is required');

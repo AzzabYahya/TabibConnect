@@ -29,7 +29,9 @@ function AdminDashboardLayout() {
     { to: '/dashboard/admin/metrics', label: t('dashboard.adminMenu.metrics'), icon: BarChart3 },
     { to: '/dashboard/admin/logs', label: t('dashboard.adminMenu.logs'), icon: Activity },
     { to: '/dashboard/admin/notifications', label: t('dashboard.adminMenu.notifications'), icon: Bell },
+    { to: '/dashboard/admin/appointments', label: 'Rendez-vous', icon: FileText },
   ];
+
 
   return (
     <DashboardShell subtitle={t('dashboard.adminSubtitle')}>

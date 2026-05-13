@@ -119,14 +119,21 @@ const getHomeSummary = async () => {
       };
     })
     .sort((left, right) => right.doctorsCount - left.doctorsCount)
-    .slice(0, 5);
+    .slice(0, 6);
 
   const citiesCount = new Set(allCabinets.map((cabinet) => cabinet.ville).filter(Boolean)).size;
+
+  const totalVerified = await prisma.avis.count({ where: { isVerified: true } });
+  const dateSeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+  const maxBatches = Math.max(1, Math.ceil(totalVerified / 3));
+  const offset = (dateSeed % maxBatches) * 3;
 
   const approvedReviews = await prisma.avis.findMany({
     where: { isVerified: true },
     orderBy: [{ createdAt: 'desc' }],
+    skip: offset < totalVerified ? offset : 0,
     take: 3,
+
     include: {
       patient: {
         include: {
@@ -146,31 +153,7 @@ const getHomeSummary = async () => {
     },
   });
 
-  const fallbackReviews = approvedReviews.length
-    ? approvedReviews
-    : await prisma.avis.findMany({
-        orderBy: [{ createdAt: 'desc' }],
-        take: 3,
-        include: {
-          patient: {
-            include: {
-              user: {
-                select: {
-                  email: true,
-                },
-              },
-            },
-          },
-          doctor: {
-            select: {
-              nomComplet: true,
-              specialite: true,
-            },
-          },
-        },
-      });
-
-  const testimonials = fallbackReviews.map((review) => ({
+  const testimonials = approvedReviews.map((review) => ({
     name: toDisplayName(review.patient?.user?.email),
     city: review.patient?.ville || 'Maroc',
     quote: review.commentaire || `Avis ${review.note}/5 pour ${review.doctor?.specialite || 'ce spécialiste'}.`,
@@ -180,6 +163,7 @@ const getHomeSummary = async () => {
     date: timeFormatter.format(review.createdAt),
     dateIso: review.createdAt.toISOString(),
   }));
+
 
   const topCities = Array.from(
     allCabinets.reduce((accumulator, cabinet) => {

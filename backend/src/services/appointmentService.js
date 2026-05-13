@@ -139,6 +139,7 @@ const getAppointmentByIdWithActors = async (appointmentId) => {
       patient: {
         select: {
           id: true,
+          userId: true,
           bookingWarnings: true,
           lastNoShowAt: true,
           antecedents: true,
@@ -156,7 +157,12 @@ const getAppointmentByIdWithActors = async (appointmentId) => {
         },
       },
       doctor: {
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          nomComplet: true,
+          specialite: true,
+          tarifConsultation: true,
           user: {
             select: {
               id: true,

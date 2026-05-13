@@ -350,6 +350,7 @@ const getAdminDashboard = async () => {
   const verificationQueue = pendingDoctors.map((doctor) => ({
     id: doctor.id,
     doctorId: doctor.id,
+    userId: doctor.user.id,
     name: doctor.nomComplet || toDisplayName(doctor.user.email),
     specialty: doctor.specialite,
     city: doctor.doctorCabinets[0]?.cabinet?.ville || 'Maroc',
@@ -418,6 +419,7 @@ const getAdminDashboard = async () => {
   const doctorChangeRequests = pendingDoctorChanges.map((request) => ({
     id: request.id,
     doctorId: request.doctorId,
+    userId: request.doctor.user.id,
     doctorName: request.doctor.nomComplet || toDisplayName(request.doctor.user.email),
     doctorEmail: request.doctor.user.email,
     type: request.type,
@@ -530,7 +532,21 @@ const getAdminAccountDetails = async ({ userId }) => {
   const account = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      patient: true,
+      patient: {
+        include: {
+          patientDocuments: {
+            select: {
+              id: true,
+              fileName: true,
+              filePath: true,
+              mimeType: true,
+              size: true,
+              createdAt: true,
+              isProfilePhoto: true,
+            },
+          },
+        },
+      },
       doctor: {
         include: {
           documents: {
@@ -541,6 +557,7 @@ const getAdminAccountDetails = async ({ userId }) => {
               mimeType: true,
               size: true,
               createdAt: true,
+              isProfilePhoto: true,
             },
           },
         },
@@ -593,7 +610,11 @@ const getAdminAccountDetails = async ({ userId }) => {
       : [],
   ]);
 
-  const profilePhoto = getProfilePhotoFromDocuments(account.doctor?.documents || []);
+  const documents = account.role === 'DOCTOR' 
+    ? account.doctor?.documents 
+    : account.patient?.patientDocuments;
+
+  const profilePhoto = getProfilePhotoFromDocuments(documents || []);
 
   return {
     account: {
@@ -759,6 +780,63 @@ const verifyReview = async ({ reviewId }) => {
     id: updated.id,
     verified: updated.isVerified,
   };
+};
+
+const updateProfilePhotoByAdmin = async ({ userId, file }) => {
+  if (!file) {
+    throw new HttpError(400, 'File is required');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { doctor: true, patient: true },
+  });
+
+  if (!user) {
+    throw new HttpError(404, 'User not found');
+  }
+
+  if (user.role === 'DOCTOR' && user.doctor) {
+    // Unmark previous profile photos
+    await prisma.doctorDocument.updateMany({
+      where: { doctorId: user.doctor.id, isProfilePhoto: true },
+      data: { isProfilePhoto: false },
+    });
+
+    // Create new profile photo
+    const document = await prisma.doctorDocument.create({
+      data: {
+        doctorId: user.doctor.id,
+        fileName: file.originalname,
+        filePath: file.path,
+        mimeType: file.mimetype,
+        size: file.size,
+        isProfilePhoto: true,
+      },
+    });
+    return document;
+  } else if (user.role === 'PATIENT' && user.patient) {
+    // Unmark previous profile photos
+    await prisma.patientDocument.updateMany({
+      where: { patientId: user.patient.id, isProfilePhoto: true },
+      data: { isProfilePhoto: false },
+    });
+
+    // Create new profile photo
+    const document = await prisma.patientDocument.create({
+      data: {
+        patientId: user.patient.id,
+        fileName: file.originalname,
+        filePath: file.path,
+        mimeType: file.mimetype,
+        size: file.size,
+        isProfilePhoto: true,
+      },
+    });
+    return document;
+  }
+
+  throw new HttpError(400, 'User role not supported for profile photo update');
 };
 
 const approveDoctorChangeRequest = async ({ requestId, adminUserId, reviewNote }) => {
@@ -1652,7 +1730,74 @@ const deleteUser = async ({ userId }) => {
   return { id: userId, deleted: true };
 };
 
+const getAdminAppointments = async ({ page, limit, status = 'ALL', search = '' }) => {
+  const { skip, page: safePage, limit: safeLimit } = clampPagination({ page, limit, maxLimit: 50 });
+  const normalizedStatus = String(status || 'ALL').toUpperCase();
+  const q = String(search || '').trim();
+
+  const where = {
+    ...(normalizedStatus !== 'ALL' ? { statut: normalizedStatus } : {}),
+    ...(q
+      ? {
+          OR: [
+            { id: { contains: q, mode: 'insensitive' } },
+            { motif: { contains: q, mode: 'insensitive' } },
+            { doctor: { nomComplet: { contains: q, mode: 'insensitive' } } },
+            { doctor: { user: { email: { contains: q, mode: 'insensitive' } } } },
+            { patient: { user: { email: { contains: q, mode: 'insensitive' } } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.rendezVous.count({ where }),
+    prisma.rendezVous.findMany({
+      where,
+      orderBy: [{ dateHeure: 'desc' }],
+      skip,
+      take: safeLimit,
+      include: {
+        patient: { include: { user: { select: { email: true } } } },
+        doctor: { include: { user: { select: { email: true } } } },
+        cabinet: true,
+      },
+    }),
+  ]);
+
+  return {
+    items: items.map((rdv) => ({
+      id: rdv.id,
+      dateTime: rdv.dateHeure,
+      status: rdv.statut,
+      type: rdv.typeConsultation,
+      reason: rdv.motif,
+      doctor: {
+        id: rdv.doctorId,
+        name: rdv.doctor?.nomComplet || toDisplayName(rdv.doctor?.user?.email),
+        specialty: rdv.doctor?.specialite,
+      },
+      patient: {
+        id: rdv.patientId,
+        name: toDisplayName(rdv.patient?.user?.email),
+        email: rdv.patient?.user?.email,
+      },
+      cabinet: rdv.cabinet ? { name: rdv.cabinet.nom, city: rdv.cabinet.ville } : null,
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasNextPage: skip + items.length < total,
+      hasPrevPage: safePage > 1,
+    },
+  };
+};
+
 module.exports = {
+  getAdminAppointments,
+
   getAdminDashboard,
   getAdminAccountDetails,
   notifyAccount,

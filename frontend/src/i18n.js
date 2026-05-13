@@ -38,6 +38,8 @@ const resources = {
         administrator: 'Administrateur',
         doctor: 'Médecin',
         patient: 'Patient',
+        error: 'Erreur',
+        retry: 'Réessayer',
       },
       notifications: {
         markAllRead: 'Tout marquer comme lu',
@@ -91,6 +93,13 @@ const resources = {
           notePlaceholder: 'Note clinique...',
           saveNote: 'Enregistrer la note',
         },
+        dashboardShell: {
+          prev: 'Précédent',
+          next: 'Suivant',
+          noNotifications: 'Aucune notification',
+          notificationError: 'Impossible de charger les notifications.',
+          markAllRead: 'Tout marquer comme lu',
+        },
       },
       appShell: {
         platformTagline: 'La plateforme médicale de référence au Maroc.',
@@ -140,6 +149,8 @@ const resources = {
         administrator: 'المدير',
         doctor: 'الطبيب',
         patient: 'المريض',
+        error: 'خطأ',
+        retry: 'إعادة المحاولة',
       },
       notifications: {
         markAllRead: 'تحديد الكل كمقروء',
@@ -193,6 +204,13 @@ const resources = {
           notePlaceholder: 'ملاحظة طبية...',
           saveNote: 'حفظ الملاحظة',
         },
+        dashboardShell: {
+          prev: 'السابق',
+          next: 'التالي',
+          noNotifications: 'لا توجد إشعارات',
+          notificationError: 'تعذر تحميل الإشعارات.',
+          markAllRead: 'تحديد الكل كمقروء',
+        },
       },
       appShell: {
         platformTagline: 'المنصة الطبية المرجعية في المغرب.',
@@ -207,7 +225,44 @@ const resources = {
       },
     },
   },
+  en: {
+    translation: {
+      appName: 'TabibConnect',
+      nav: {
+        home: 'Home',
+        search: 'Search',
+        login: 'Login',
+        register: 'Register',
+        patientDashboard: 'Patient Dashboard',
+        doctorDashboard: 'Doctor Dashboard',
+        adminDashboard: 'Admin Dashboard',
+      },
+      common: {
+        notifications: 'Notifications',
+        logout: 'Logout',
+        logoutLoading: 'Logging out...',
+        settings: 'Settings',
+        mySpace: 'My Space',
+        administrator: 'Administrator',
+        doctor: 'Doctor',
+        patient: 'Patient',
+        error: 'Error',
+        retry: 'Retry',
+      },
+      dashboardShell: {
+        prev: 'Previous',
+        next: 'Next',
+        noNotifications: 'No notifications',
+        notificationError: 'Could not load notifications.',
+        markAllRead: 'Mark all as read',
+      },
+    },
+  },
 };
+
+i18n.on('languageChanged', (lng) => {
+  document.dir = lng === 'ar' ? 'rtl' : 'ltr';
+});
 
 i18n.use(initReactI18next).init({
   resources,

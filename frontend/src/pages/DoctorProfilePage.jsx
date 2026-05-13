@@ -59,6 +59,7 @@ const defaultBookingForm = {
   motif: '',
   notes: '',
   methodePaiement: 'CMI',
+  typeConsultation: 'PRESENTIEL',
   acceptedGeneralTerms: false,
   acceptedCashPolicy: false,
   cardHolder: '',
@@ -67,6 +68,7 @@ const defaultBookingForm = {
   expYear: '',
   cvc: '',
 };
+
 
 const toSafeNumber = (value) => {
   const parsed = Number(value);
@@ -335,7 +337,7 @@ function DoctorProfilePage() {
         motif: bookingForm.motif.trim(),
         notes: bookingForm.notes.trim() || undefined,
         dateHeure: selectedSlot.start,
-        typeConsultation: 'PRESENTIEL',
+        typeConsultation: bookingForm.typeConsultation,
         methodePaiement: bookingForm.methodePaiement,
         acceptedGeneralTerms: bookingForm.acceptedGeneralTerms,
         acceptedCashPolicy: bookingForm.methodePaiement === 'CASH' ? bookingForm.acceptedCashPolicy : false,
@@ -705,8 +707,58 @@ function DoctorProfilePage() {
               Cabinet: <strong className="break-words">{selectedSlot?.cabinet?.nom || firstCabinet?.nom || 'N/A'}</strong>
             </p>
             <p className="min-w-0 break-words">
-              Mode de consultation : <strong>Présentiel</strong>
+              Mode de consultation : <strong>{bookingForm.typeConsultation === 'PRESENTIEL' ? 'Présentiel' : 'En ligne'}</strong>
             </p>
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Type de consultation</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label
+                className={`cursor-pointer rounded-2xl border p-4 transition ${
+                  bookingForm.typeConsultation === 'PRESENTIEL'
+                    ? 'border-med-primary bg-med-primary/10'
+                    : 'border-slate-200 bg-slate-50 hover:border-med-primary/40'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="typeConsultation"
+                    value="PRESENTIEL"
+                    checked={bookingForm.typeConsultation === 'PRESENTIEL'}
+                    onChange={() => setBookingForm((c) => ({ ...c, typeConsultation: 'PRESENTIEL' }))}
+                    className="mt-1 accent-med-primary"
+                  />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-slate-900">Présentiel</p>
+                    <p className="text-xs text-slate-600">Au cabinet du médecin.</p>
+                  </div>
+                </div>
+              </label>
+              <label
+                className={`cursor-pointer rounded-2xl border p-4 transition ${
+                  bookingForm.typeConsultation === 'TELECONSULTATION'
+                    ? 'border-med-primary bg-med-primary/10'
+                    : 'border-slate-200 bg-slate-50 hover:border-med-primary/40'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="typeConsultation"
+                    value="TELECONSULTATION"
+                    checked={bookingForm.typeConsultation === 'TELECONSULTATION'}
+                    onChange={() => setBookingForm((c) => ({ ...c, typeConsultation: 'TELECONSULTATION' }))}
+                    className="mt-1 accent-med-primary"
+                  />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-slate-900">En ligne</p>
+                    <p className="text-xs text-slate-600">Via appel vidéo sécurisé.</p>
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
 
           <Input

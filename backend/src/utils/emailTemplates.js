@@ -1,3 +1,12 @@
+const escapeHtml = (unsafe) => {
+  return String(unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 const getVerificationEmailTemplate = ({ verificationUrl }) => {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #1f2937;">
@@ -28,7 +37,7 @@ const getPasswordResetEmailTemplate = ({ resetToken, resetUrl, expiresInMinutes 
         </a>
       </p>
       <p>Reset token:</p>
-      <pre style="background: #f3f4f6; padding: 12px; border-radius: 8px;">${resetToken}</pre>
+      <pre style="background: #f3f4f6; padding: 12px; border-radius: 8px;">${escapeHtml(resetToken)}</pre>
       <p>If the button does not work, use this link:</p>
       <p><a href="${resetUrl}">${resetUrl}</a></p>
       <p style="font-size: 12px; color: #6b7280; margin-top: 24px;">If you did not request this change, ignore this email.</p>
@@ -56,7 +65,7 @@ const getAppointmentConfirmationTemplate = ({ appointment, role }) => {
       <h2 style="color: #166534;">${headline}</h2>
       <p>Date et heure: <strong>${dateLabel}</strong></p>
       <p>Type de consultation: <strong>${appointment.typeConsultation}</strong></p>
-      <p>Motif: ${appointment.motif}</p>
+      <p>Motif: ${escapeHtml(appointment.motif)}</p>
       <p style="font-size: 12px; color: #6b7280;">Merci d'arriver quelques minutes avant l'heure prevue.</p>
     </div>
   `;
@@ -70,7 +79,7 @@ const getAppointmentCancellationTemplate = ({ appointment, cancelledByRole, free
       <h2 style="color: #991b1b;">Annulation de rendez-vous</h2>
       <p>Le rendez-vous du <strong>${dateLabel}</strong> a ete annule.</p>
       <p>Annule par: <strong>${cancelledByRole}</strong></p>
-      <p>Motif: ${appointment.cancellationReason || 'Non renseigne'}</p>
+      <p>Motif: ${escapeHtml(appointment.cancellationReason || 'Non renseigne')}</p>
       <p>Politique: <strong>${
         freeCancellation
           ? 'Annulation gratuite appliquee (>= 2h avant le rendez-vous).'
@@ -93,7 +102,7 @@ const getAppointmentReminderTemplate = ({ appointment, role }) => {
       }</p>
       <p>Date et heure: <strong>${dateLabel}</strong></p>
       <p>Type: <strong>${appointment.typeConsultation}</strong></p>
-      <p>Motif: ${appointment.motif}</p>
+      <p>Motif: ${escapeHtml(appointment.motif)}</p>
     </div>
   `;
 };
@@ -110,7 +119,7 @@ const getAppointmentCreatedTemplate = ({ appointment, role }) => {
       <h2 style="color: #0f766e;">${headline}</h2>
       <p>Date et heure demandees: <strong>${dateLabel}</strong></p>
       <p>Type: <strong>${appointment.typeConsultation}</strong></p>
-      <p>Motif: ${appointment.motif}</p>
+      <p>Motif: ${escapeHtml(appointment.motif)}</p>
       <p>Statut actuel: <strong>${appointment.statut}</strong></p>
       <p style="font-size: 12px; color: #6b7280;">Un medecin confirmera ce rendez-vous tres bientot.</p>
     </div>
@@ -129,7 +138,7 @@ const getAppointmentCompletedTemplate = ({ appointment, role }) => {
       <h2 style="color: #166534;">${headline}</h2>
       <p>Date et heure: <strong>${dateLabel}</strong></p>
       <p>Type: <strong>${appointment.typeConsultation}</strong></p>
-      <p>Motif: ${appointment.motif}</p>
+      <p>Motif: ${escapeHtml(appointment.motif)}</p>
       <p style="font-size: 12px; color: #6b7280;">Merci d'avoir fait confiance a TabibConnect.</p>
     </div>
   `;
@@ -146,7 +155,7 @@ const getAppointmentNoShowTemplate = ({ appointment, role }) => {
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #111827;">
       <h2 style="color: #92400e;">${headline}</h2>
       <p>Le rendez-vous du <strong>${dateLabel}</strong> a ete marque comme non honore.</p>
-      <p>Motif: ${appointment.motif}</p>
+      <p>Motif: ${escapeHtml(appointment.motif)}</p>
       <p style="font-size: 12px; color: #6b7280;">Contactez-nous si cette information est incorrecte.</p>
     </div>
   `;
@@ -166,7 +175,7 @@ const getAppointmentRescheduledTemplate = ({ appointment, previousDateHeure, rol
       <p>Ancienne date: <strong>${previousLabel}</strong></p>
       <p>Nouvelle date: <strong>${dateLabel}</strong></p>
       <p>Reprogramme par: <strong>${rescheduledByRole}</strong></p>
-      <p>Motif: ${reason || 'Non renseigne'}</p>
+      <p>Motif: ${escapeHtml(reason || 'Non renseigne')}</p>
       <p style="font-size: 12px; color: #6b7280;">Merci de verifier la nouvelle date.</p>
     </div>
   `;
@@ -183,3 +192,4 @@ module.exports = {
   getPasswordResetEmailTemplate,
   getVerificationEmailTemplate,
 };
+

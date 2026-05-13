@@ -135,6 +135,22 @@ router.get(
   asyncHandler(adminFileController.getDoctorDocument)
 );
 
+router.get(
+  '/patients/:patientId/documents/:documentId',
+  param('patientId').isString().isLength({ min: 10, max: 40 }),
+  param('documentId').isString().isLength({ min: 10, max: 40 }),
+  validateRequest,
+  asyncHandler(adminFileController.getPatientDocument)
+);
+
+router.get(
+  '/users/:userId/cin',
+  param('userId').isString().isLength({ min: 10, max: 40 }),
+  validateRequest,
+  asyncHandler(adminFileController.getUserCinDocument)
+);
+
+
 router.post(
   '/notifications/mark-read',
   body('ids').isArray({ min: 1 }),
@@ -158,7 +174,18 @@ router.delete(
 );
 
 router.get(
+  '/appointments',
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+  query('status').optional().isIn(['ALL', 'EN_ATTENTE', 'CONFIRME', 'COMPLETE', 'ANNULE', 'NO_SHOW']),
+  query('search').optional().isString(),
+  validateRequest,
+  asyncHandler(dashboardController.getAdminAppointments)
+);
+
+router.get(
   '/patient-change-requests',
+
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 50 }),
   validateRequest,
@@ -179,6 +206,16 @@ router.post(
   body('reviewNote').optional().isString().isLength({ max: 1000 }),
   validateRequest,
   asyncHandler(dashboardController.rejectPatientChangeRequest)
+);
+
+const uploadDoctorDocuments = require('../middlewares/uploadDoctorDocuments');
+
+router.post(
+  '/users/:userId/profile-photo',
+  param('userId').isString().isLength({ min: 10, max: 40 }),
+  uploadDoctorDocuments.single('profilePhoto'),
+  validateRequest,
+  asyncHandler(dashboardController.updateProfilePhotoByAdmin)
 );
 
 module.exports = router;

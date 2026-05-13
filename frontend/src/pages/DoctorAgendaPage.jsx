@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+
 
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -45,8 +46,11 @@ function addDaysISO(iso, days) {
   return toLocalDateKey(d);
 }
 
+
 function DoctorAgendaPage() {
+  const navigate = useNavigate();
   const { t } = useTranslation();
+
   const [weekStart, setWeekStart] = useState(startOfWeekISO(new Date()));
   const [selected, setSelected] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -250,7 +254,15 @@ function DoctorAgendaPage() {
               >
                 {t('dashboard.agenda.cancel')}
               </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate(`/appointment/${selected.id}`)}
+              >
+                Voir fiche complète
+              </Button>
             </div>
+
 
             <textarea
               className="w-full rounded-xl border px-3 py-2 text-sm"

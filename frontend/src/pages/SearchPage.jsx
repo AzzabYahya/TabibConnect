@@ -146,8 +146,9 @@ function SearchPage() {
     return [];
   };
 
-  // Fetch doctors
   const query = filters.query.trim();
+
+  // Fetch doctors
   useEffect(() => {
     const fetchDoctors = async () => {
       setLoading(true);
@@ -155,14 +156,18 @@ function SearchPage() {
         const params = {
           page: currentPage,
           limit: resultsPerPage,
+          q: query || undefined,
+          ville: filters.ville || undefined,
+          specialite: filters.specialite || undefined,
+          maxTarif: filters.tarifMax < maxTarifLimit ? filters.tarifMax : undefined,
+          accepteAssurance: filters.assuranceOnly || undefined,
+          minNote: filters.noteMin > 0 ? filters.noteMin : undefined,
+          videoOnly: filters.videoOnly || undefined,
         };
 
-        let response;
-        if (query.length >= 2) {
-          response = await api.get('/doctors/search', { params: { q: query, ...params } });
-        } else {
-          response = await api.get('/doctors', { params });
-        }
+
+        const response = await api.get('/doctors', { params });
+
         const data = response.data?.data;
         setDoctors(normalizeDoctorList(data));
         if (data?.pagination) {
@@ -177,7 +182,19 @@ function SearchPage() {
     };
 
     fetchDoctors();
-  }, [query, currentPage]);
+  }, [
+    filters.query,
+    filters.ville,
+    filters.specialite,
+    filters.tarifMax,
+    filters.sexe,
+    filters.langues,
+    filters.assuranceOnly,
+    filters.videoOnly,
+    filters.noteMin,
+    currentPage
+  ]);
+
 
   const handleBooking = (doctor) => {
     if (!session?.user) {
@@ -189,6 +206,21 @@ function SearchPage() {
 
   const filteredDoctors = useMemo(() => {
     let result = Array.isArray(doctors) ? [...doctors] : [];
+
+    if (filters.ville) {
+      result = result.filter((doc) => {
+        const docVille = (doc.doctorCabinets || []).some(dc => 
+          dc.cabinet?.ville?.toLowerCase().includes(filters.ville.toLowerCase())
+        );
+        return docVille;
+      });
+    }
+
+    if (filters.specialite) {
+      result = result.filter((doc) => 
+        doc.specialite?.toLowerCase().includes(filters.specialite.toLowerCase())
+      );
+    }
 
     if (filters.tarifMax < maxTarifLimit) {
       result = result.filter((doc) => Number(doc.tarifConsultation || 0) <= filters.tarifMax);
@@ -216,6 +248,7 @@ function SearchPage() {
     if (filters.noteMin > 0) {
       result = result.filter((doc) => Number(doc.ratingAverage || 0) >= filters.noteMin);
     }
+
 
     if (sortBy === 'tarif') {
       result.sort((a, b) => Number(a.tarifConsultation || 0) - Number(b.tarifConsultation || 0));

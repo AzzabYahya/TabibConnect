@@ -88,6 +88,14 @@ router.get(
 );
 
 router.get(
+  '/me/patients/:patientId/profile',
+  authenticate,
+  authorize(['DOCTOR']),
+  asyncHandler(doctorController.getDoctorPatientProfile)
+);
+
+
+router.get(
   '/me/stats',
   authenticate,
   authorize(['DOCTOR']),

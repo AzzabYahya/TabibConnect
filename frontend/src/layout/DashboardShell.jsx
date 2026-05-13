@@ -138,43 +138,56 @@ function DashboardShell({ subtitle, children }) {
 
       <Modal isOpen={isNotifOpen} title={t('common.notifications')} onClose={() => setIsNotifOpen(false)}>
         <div className="space-y-4">
-          {notificationsQuery.isLoading ? (
+          {notificationsQuery.isError ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+              <div className="rounded-full bg-red-50 p-3 text-red-500">
+                <Bell size={24} />
+              </div>
+              <p className="text-sm font-medium text-slate-900">{t('common.error')}</p>
+              <p className="text-xs text-slate-500">{t('dashboardShell.notificationError', 'Impossible de charger les notifications.')}</p>
+              <Button size="sm" variant="outline" onClick={() => notificationsQuery.refetch()} className="mt-2">
+                {t('common.retry', 'Réessayer')}
+              </Button>
+            </div>
+          ) : notificationsQuery.isLoading ? (
             <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-12" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16" />
               ))}
             </div>
           ) : (notificationsQuery.data?.items || []).length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-6">
-              <Bell className="h-8 w-8 text-slate-300" />
-              <p className="text-sm text-slate-600">Aucune notification</p>
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <div className="rounded-full bg-slate-50 p-4 text-slate-300">
+                <Bell size={32} />
+              </div>
+              <p className="text-sm font-medium text-slate-600">
+                {t('dashboardShell.noNotifications', 'Aucune notification')}
+              </p>
             </div>
           ) : (
-            <div className="max-h-[65vh] space-y-2 overflow-y-auto">
+            <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-1">
               {(notificationsQuery.data?.items || []).map((n) => (
-                <Card
-                  key={n.id}
-                  className={`p-3 ${!n.isRead ? 'border-l-2 border-l-blue-500 bg-blue-50' : 'bg-slate-50'}`}
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{n.type}</p>
-                        {!n.isRead && <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />}
-                      </div>
-                      <p className="mt-1 text-sm text-slate-700">{n.message}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(n.createdAt).toLocaleDateString('fr-MA', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                <div key={n.id} className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 transition-colors hover:bg-slate-100">
+                  <div className="mt-1">
+                    <div className={`rounded-full p-1.5 ${!n.isRead ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'}`}>
+                      <Bell className="h-3.5 w-3.5" />
                     </div>
                   </div>
-                </Card>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-semibold ${!n.isRead ? 'text-slate-900' : 'text-slate-500'}`}>
+                          {n.title}
+                        </p>
+                        {!n.isRead ? <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> : null}
+                      </div>
+                      <p className="text-[10px] font-medium text-slate-400">{n.time}</p>
+                    </div>
+                    <p className={`mt-0.5 text-sm ${!n.isRead ? 'text-slate-700' : 'text-slate-500'}`}>
+                      {n.body}
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -203,7 +216,7 @@ function DashboardShell({ subtitle, children }) {
             </div>
           </div>
 
-          <Button onClick={() => markReadAll().catch(() => {})} className="w-full">
+          <Button onClick={() => markReadAll().catch(() => { })} className="w-full">
             {t('notifications.markAllRead', 'Tout marquer comme lu')}
           </Button>
         </div>

@@ -33,7 +33,63 @@ const getDoctorDocument = async (req, res) => {
   return res.sendFile(resolved);
 };
 
+const getPatientDocument = async (req, res) => {
+  const { patientId, documentId } = req.params;
+
+  const document = await prisma.patientDocument.findFirst({
+    where: { id: documentId, patientId },
+    select: { filePath: true, mimeType: true },
+  });
+
+  if (!document) {
+    throw new HttpError(404, 'Document not found');
+  }
+
+  const resolved = path.resolve(document.filePath);
+  if (!fs.existsSync(resolved)) {
+    throw new HttpError(404, 'File not found on disk');
+  }
+
+  res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+  return res.sendFile(resolved);
+};
+
+const getUserCinDocument = async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { doctor: true, patient: true },
+  });
+
+  if (!user) throw new HttpError(404, 'User not found');
+
+  let filePath, mimeType;
+  if (user.role === 'DOCTOR' && user.doctor) {
+    filePath = user.doctor.cinDocumentFilePath;
+    mimeType = user.doctor.cinDocumentMimeType;
+  } else if (user.role === 'PATIENT' && user.patient) {
+    filePath = user.patient.cinDocumentFilePath;
+    mimeType = user.patient.cinDocumentMimeType;
+  }
+
+  if (!filePath) {
+    throw new HttpError(404, 'CIN document not found for this user');
+  }
+
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) {
+    throw new HttpError(404, 'File not found on disk');
+  }
+
+  res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+  return res.sendFile(resolved);
+};
+
 module.exports = {
   getDoctorDocument,
+  getPatientDocument,
+  getUserCinDocument,
 };
+
 

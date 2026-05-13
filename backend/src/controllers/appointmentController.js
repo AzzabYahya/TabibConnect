@@ -1,9 +1,19 @@
 const appointmentService = require('../services/appointmentService');
+const { logAction } = require('../services/auditService');
+
 
 const createAppointment = async (req, res) => {
   const appointment = await appointmentService.createAppointment({
     userId: req.user.id,
     payload: req.body,
+  });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'RDV_CREATED',
+    resource: `Appointment:${appointment.id}`,
+    payload: { doctorId: appointment.doctorId, dateHeure: appointment.dateHeure },
+    req,
   });
 
   res.status(201).json({
@@ -58,6 +68,13 @@ const confirmAppointment = async (req, res) => {
     userId: req.user.id,
   });
 
+  await logAction({
+    userId: req.user.id,
+    action: 'RDV_CONFIRMED',
+    resource: `Appointment:${appointment.id}`,
+    req,
+  });
+
   res.status(200).json({
     status: 'success',
     message: 'Appointment confirmed successfully',
@@ -71,6 +88,14 @@ const cancelAppointment = async (req, res) => {
     userId: req.user.id,
     role: req.user.role,
     reason: req.body.reason,
+  });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'RDV_CANCELLED',
+    resource: `Appointment:${req.params.id}`,
+    payload: { reason: req.body.reason },
+    req,
   });
 
   res.status(200).json({

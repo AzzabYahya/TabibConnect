@@ -12,14 +12,15 @@ router.use(authenticate);
 
 router.get(
   '/',
-  query('page').optional().isInt({ min: 1 }).toInt(),
-  query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
-  validateRequest,
   asyncHandler(async (req, res) => {
-    const page = req.query.page || 1;
-    const limit = req.query.limit || 20;
-    const where = { userId: req.user.id };
-    const [items, total] = await Promise.all([
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const userId = req.user.id;
+    
+    console.log(`[NotificationRoute] Fetching for userId: ${userId}, page: ${page}`);
+
+    const where = { userId };
+    const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }],
@@ -28,6 +29,38 @@ router.get(
       }),
       prisma.notification.count({ where }),
     ]);
+
+    console.log(`[NotificationRoute] Found ${notifications.length} notifications (total: ${total})`);
+
+    // Standardize to mapped format used by dashboards
+    const notificationTitles = {
+      RAPPEL_RDV: 'Rappel de rendez-vous',
+      RDV_CONFIRME: 'Rendez-vous confirme',
+      RDV_ANNULE: 'Rendez-vous annule',
+      PAIEMENT_RECU: 'Paiement recu',
+      SYSTEME: 'Information systeme',
+    };
+
+    const buildRelativeLabel = (dateValue) => {
+      const date = new Date(dateValue);
+      const diffInMinutes = Math.round((Date.now() - date.getTime()) / (1000 * 60));
+      if (diffInMinutes < 1) return 'À l\'instant';
+      if (diffInMinutes < 60) return `Il y a ${diffInMinutes} min`;
+      const diffInHours = Math.round(diffInMinutes / 60);
+      if (diffInHours < 24) return `Il y a ${diffInHours} h`;
+      return date.toLocaleDateString('fr-MA', { day: '2-digit', month: 'short' });
+    };
+
+    const items = notifications.map(n => ({
+      id: n.id,
+      type: n.type,
+      title: notificationTitles[n.type] || 'Notification',
+      body: n.message,
+      time: buildRelativeLabel(n.createdAt),
+      createdAt: n.createdAt,
+      isRead: n.isRead,
+    }));
+
     res.status(200).json({
       status: 'success',
       data: {

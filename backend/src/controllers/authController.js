@@ -7,6 +7,8 @@ const {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
 } = require('../utils/tokenUtils');
+const { logAction } = require('../services/auditService');
+
 
 const registerPatient = async (req, res) => {
   const result = await authService.registerPatient(req.body, req.file || null);
@@ -45,7 +47,15 @@ const login = async (req, res) => {
 
   setRefreshTokenCookie(res, result.refreshToken);
 
+  await logAction({
+    userId: result.user.id,
+    action: 'USER_LOGIN',
+    resource: `User:${result.user.id}`,
+    req,
+  });
+
   return res.status(200).json({
+
     status: 'success',
     message: 'Login successful',
     data: {

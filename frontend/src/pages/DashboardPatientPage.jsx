@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { MapPin } from 'lucide-react';
+import { MapPin, AlertTriangle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -126,8 +126,30 @@ function DashboardPatientPage() {
 
   const unreadBadge = useMemo(() => (dashboard.summary?.unreadNotifications || 0) > 0, [dashboard.summary]);
 
+  const warnings = medical.warnings || 0;
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+    <div className="space-y-6">
+      {warnings > 0 && (
+        <Card className={`border-none shadow-sm ${warnings >= 2 ? 'bg-red-50 text-red-900' : 'bg-amber-50 text-amber-900'}`}>
+          <div className="flex items-center gap-3 p-1">
+            <AlertTriangle className={`h-6 w-6 ${warnings >= 2 ? 'text-red-500' : 'text-amber-500'}`} />
+            <div className="flex-1">
+              <p className="text-sm font-bold">
+                {warnings >= 2 ? 'Action Requise : Compte en sursis' : 'Attention : Fiabilité en baisse'}
+              </p>
+              <p className="text-xs opacity-80">
+                Vous avez {warnings} avertissement(s). Pour éviter des restrictions, veillez à honorer vos prochains rendez-vous ou à annuler au moins 24h à l'avance.
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={() => navigate('/profile')} className="text-xs font-bold uppercase underline">
+              Voir mon score
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
       <div className="space-y-6">
         <Card className="space-y-4 border-med-primary/20 bg-gradient-to-br from-emerald-50 to-white">
           <div className="flex items-start justify-between gap-3">
@@ -204,6 +226,7 @@ function DashboardPatientPage() {
                     <Badge variant={statusColor[rdv.status] || 'neutral'}>{rdv.status}</Badge>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/appointment/${rdv.id}`)}>Détails</Button>
                     {rdv.status === 'COMPLETE' && rdv.canReview ? (
                       <Button size="sm" onClick={() => navigate(`/appointment/${rdv.id}`)}>Laisser un avis</Button>
                     ) : null}
@@ -212,6 +235,7 @@ function DashboardPatientPage() {
                     ) : null}
                     <Button size="sm" variant="outline" onClick={() => navigate(`/doctor/${rdv.doctorId}`)}>Re-réserver</Button>
                   </div>
+
                 </div>
               ))}
               {!historyItems.length ? <p className="text-sm text-slate-600">Aucun RDV.</p> : null}
@@ -311,8 +335,9 @@ function DashboardPatientPage() {
           </div>
         </Card>
       </div>
+    </div>
 
-      <Modal isOpen={isProfileRequestOpen} title="Demande de modification profil (validation admin)" onClose={() => setIsProfileRequestOpen(false)}>
+    <Modal isOpen={isProfileRequestOpen} title="Demande de modification profil (validation admin)" onClose={() => setIsProfileRequestOpen(false)}>
         <div className="space-y-3">
           <div className="grid gap-2 md:grid-cols-2">
             <input className="rounded-xl border px-3 py-2 text-sm" placeholder="Ville" value={profileForm.ville} onChange={(e) => setProfileForm((c) => ({ ...c, ville: e.target.value }))} />

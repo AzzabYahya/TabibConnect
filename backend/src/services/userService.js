@@ -50,19 +50,6 @@ const getUserProfile = async ({ requester, userId }) => {
     displayName: account.doctor?.nomComplet || toDisplayName(account.email),
   };
 
-  const patientProfile = account.patient
-    ? {
-        cin: requester.role === 'ADMIN' || requester.id === account.id ? account.patient.cin : null,
-        ville: account.patient.ville,
-        sexe: account.patient.sexe,
-        dateOfNaissance: account.patient.dateOfNaissance,
-        groupeSanguin: account.patient.groupeSanguin,
-        antecedents: account.patient.antecedents,
-        bookingWarnings: account.patient.bookingWarnings,
-        lastNoShowAt: account.patient.lastNoShowAt,
-      }
-    : null;
-
   let profilePhoto = null;
   if (account.doctor) {
     profilePhoto =
@@ -76,7 +63,35 @@ const getUserProfile = async ({ requester, userId }) => {
         orderBy: { createdAt: 'desc' },
         select: { id: true },
       }));
+  } else if (account.patient) {
+    profilePhoto =
+      (await prisma.patientDocument.findFirst({
+        where: { patientId: account.patient.id, isProfilePhoto: true },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      }))
+      || (await prisma.patientDocument.findFirst({
+        where: { patientId: account.patient.id, mimeType: { startsWith: 'image/' } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      }));
   }
+
+  const patientProfile = account.patient
+    ? {
+        cin: requester.role === 'ADMIN' || requester.id === account.id ? account.patient.cin : null,
+        ville: account.patient.ville,
+        sexe: account.patient.sexe,
+        dateOfNaissance: account.patient.dateOfNaissance,
+        groupeSanguin: account.patient.groupeSanguin,
+        antecedents: account.patient.antecedents,
+        bookingWarnings: account.patient.bookingWarnings,
+        lastNoShowAt: account.patient.lastNoShowAt,
+        profilePhotoUrl: profilePhoto
+          ? `/api/patients/${account.patient.id}/profile-photo?v=${profilePhoto.id}`
+          : null,
+      }
+    : null;
 
   const doctorProfile = account.doctor
     ? {

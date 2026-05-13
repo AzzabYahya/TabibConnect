@@ -1,4 +1,6 @@
 const doctorService = require('../services/doctorService');
+const { logAction } = require('../services/auditService');
+
 
 const listDoctors = async (req, res) => {
   const doctors = await doctorService.listDoctors(req.query);
@@ -31,6 +33,13 @@ const updateDoctorProfile = async (req, res) => {
   const updated = await doctorService.updateDoctorProfile({
     userId: req.user.id,
     payload: req.body,
+  });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'DOCTOR_PROFILE_UPDATE',
+    resource: `Doctor:${updated.id}`,
+    req,
   });
 
   res.status(200).json({
@@ -94,6 +103,14 @@ const createDoctorAvailability = async (req, res) => {
     userId: req.user.id,
     payload: req.body,
   });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'AVAILABILITY_CREATE',
+    resource: `Availability:${data.id}`,
+    req,
+  });
+
   res.status(201).json({
     status: 'success',
     data,
@@ -128,6 +145,15 @@ const submitDoctorChangeRequest = async (req, res) => {
     userId: req.user.id,
     payload: req.body,
   });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'CHANGE_REQUEST_SUBMIT',
+    resource: `ChangeRequest:${data.id}`,
+    payload: { type: data.type },
+    req,
+  });
+
   res.status(201).json({
     status: 'success',
     message: 'Change request submitted to admin',
@@ -205,6 +231,22 @@ const getDoctorPatientHistory = async (req, res) => {
   res.status(200).json({ status: 'success', data });
 };
 
+const getDoctorPatientProfile = async (req, res) => {
+  const data = await doctorService.getDoctorPatientProfile({
+    userId: req.user.id,
+    patientId: req.params.patientId,
+  });
+
+  await logAction({
+    userId: req.user.id,
+    action: 'MEDICAL_DATA_VIEWED',
+    resource: `Patient:${req.params.patientId}`,
+    req,
+  });
+
+  res.status(200).json({ status: 'success', data });
+};
+
 const getDoctorStats = async (req, res) => {
   const data = await doctorService.getDoctorStats({ userId: req.user.id });
   res.status(200).json({ status: 'success', data });
@@ -230,5 +272,7 @@ module.exports = {
   listDoctorPatients,
   getDoctorReceivedReviews,
   getDoctorPatientHistory,
+  getDoctorPatientProfile,
   getDoctorStats,
 };
+

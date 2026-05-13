@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -9,8 +9,14 @@ import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 
+import AdminDocumentViewer from '../components/admin/AdminDocumentViewer';
+
 function AdminDoctorsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pendingRef = useRef(null);
+  const verifiedRef = useRef(null);
+
   const [pendingPage, setPendingPage] = useState(1);
   const [verifiedPage, setVerifiedPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -18,11 +24,22 @@ function AdminDoctorsPage() {
   const [sortDir, setSortDir] = useState('desc');
   const [rejecting, setRejecting] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [viewingCin, setViewingCin] = useState(null);
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (status === 'PENDING' && pendingRef.current) {
+      pendingRef.current.scrollIntoView({ behavior: 'smooth' });
+    } else if (status === 'VERIFIED' && verifiedRef.current) {
+      verifiedRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setPendingPage(1);
     setVerifiedPage(1);
   }, [search, sortBy, sortDir]);
+
 
   const pendingQuery = useQuery({
     queryKey: ['admin-doctors-pending', pendingPage, search, sortBy, sortDir],
@@ -100,8 +117,9 @@ function AdminDoctorsPage() {
         </select>
       </Card>
 
-      <Card className="space-y-3 overflow-x-auto">
+      <Card ref={pendingRef} className="space-y-3 overflow-x-auto">
         <p className="px-1 text-sm font-semibold text-slate-900">Médecins en attente</p>
+
         {pendingQuery.isLoading ? (
           <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`pending-${i}`} className="h-10" />)}</div>
         ) : (
@@ -139,8 +157,16 @@ function AdminDoctorsPage() {
                       <Button size="sm" variant="outline" onClick={() => setRejecting(doc)} disabled={rejectMutation.isPending}>
                         Rejeter
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewingCin(doc)}
+                      >
+                        Voir CIN
+                      </Button>
                     </div>
                   </td>
+
                 </tr>
               ))}
               {!pendingItems.length ? (
@@ -160,8 +186,9 @@ function AdminDoctorsPage() {
         </div>
       </Card>
 
-      <Card className="space-y-3 overflow-x-auto">
+      <Card ref={verifiedRef} className="space-y-3 overflow-x-auto">
         <p className="px-1 text-sm font-semibold text-slate-900">Médecins vérifiés</p>
+
         {verifiedQuery.isLoading ? (
           <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`verified-${i}`} className="h-10" />)}</div>
         ) : (
@@ -241,7 +268,35 @@ function AdminDoctorsPage() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={Boolean(viewingCin)}
+        title="Vérification de la CIN"
+        onClose={() => setViewingCin(null)}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+            <div className="h-10 w-10 rounded-full bg-med-primary/10 flex items-center justify-center text-med-primary">
+              <span className="font-bold text-lg">{viewingCin?.name?.[0]}</span>
+            </div>
+            <div>
+              <p className="font-bold text-slate-900">{viewingCin?.name}</p>
+              <p className="text-xs text-slate-500">{viewingCin?.email}</p>
+            </div>
+          </div>
+
+          <AdminDocumentViewer
+            endpoint={`/admin/users/${viewingCin?.userId}/cin`}
+            title="Carte Nationale d'Identité"
+          />
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setViewingCin(null)}>Fermer</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
+
   );
 }
 

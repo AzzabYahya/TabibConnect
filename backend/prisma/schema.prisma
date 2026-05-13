@@ -16,6 +16,7 @@ model User {
   isVerified                    Boolean                @default(false)
   createdAt                     DateTime               @default(now())
   updatedAt                     DateTime               @updatedAt
+  deletedAt                     DateTime?
   emailVerificationExpiresAt    DateTime?
   emailVerificationTokenHash    String?
   lastLoginAt                   DateTime?
@@ -47,6 +48,7 @@ model Patient {
   antecedents                   String?
   createdAt                     DateTime                   @default(now())
   updatedAt                     DateTime                   @updatedAt
+  deletedAt                     DateTime?
   bookingWarnings               Int                        @default(0)
   lastNoShowAt                  DateTime?
   cinDocumentFileName           String?
@@ -103,6 +105,7 @@ model Doctor {
   experience                    Int
   createdAt                     DateTime                   @default(now())
   updatedAt                     DateTime                   @updatedAt
+  deletedAt                     DateTime?
   nomComplet                    String?
   cinDocumentFileName           String?
   cinDocumentFilePath           String?
@@ -437,3 +440,18 @@ enum PatientChangeRequestStatus {
   APPROVED
   REJECTED
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // e.g., "USER_LOGIN", "RDV_CANCELLED", "MEDICAL_DATA_VIEWED"
+  resource  String   // e.g., "Patient:ck..."
+  payload   Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+

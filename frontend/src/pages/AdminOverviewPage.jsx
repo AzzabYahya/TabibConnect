@@ -36,33 +36,6 @@ function AdminOverviewPage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Validation impossible.'),
   });
 
-  const patientRequestsQuery = useQuery({
-    queryKey: ['admin-patient-change-requests'],
-    staleTime: 15 * 1000,
-    queryFn: async () => {
-      const response = await api.get('/admin/patient-change-requests', { params: { page: 1, limit: 5 } });
-      return response.data?.data;
-    },
-  });
-
-  const approvePatientReq = useMutation({
-    mutationFn: async (requestId) => api.post(`/admin/patient-change-requests/${requestId}/approve`, { reviewNote: 'Validé' }),
-    onSuccess: async () => {
-      toast.success('Demande patient approuvée.');
-      await patientRequestsQuery.refetch();
-    },
-    onError: (error) => toast.error(error?.response?.data?.message || 'Action impossible.'),
-  });
-
-  const rejectPatientReq = useMutation({
-    mutationFn: async (requestId) => api.post(`/admin/patient-change-requests/${requestId}/reject`, { reviewNote: 'Rejeté' }),
-    onSuccess: async () => {
-      toast.success('Demande patient rejetée.');
-      await patientRequestsQuery.refetch();
-    },
-    onError: (error) => toast.error(error?.response?.data?.message || 'Action impossible.'),
-  });
-
   if (dashboardQuery.isLoading) {
     return (
       <div className="space-y-4">
@@ -87,23 +60,28 @@ function AdminOverviewPage() {
   const quickDoctors = (dashboard.accounts || []).filter((item) => item.role === 'DOCTOR').slice(0, 6);
 
   const summaryCards = [
-    { label: 'Médecins vérifiés', value: summary.verifiedDoctors || 0, detail: 'Comptes actifs', tone: 'success' },
-    { label: 'Médecins en attente', value: summary.pendingDoctors || 0, detail: 'Dossiers à examiner', tone: 'warning' },
-    { label: 'Avis à valider', value: summary.pendingReviews || 0, detail: 'Modération requise', tone: 'info' },
-    { label: 'RDV complétés', value: summary.completedAppointments || 0, detail: 'Consultations terminées', tone: 'neutral' },
+    { label: 'Médecins vérifiés', value: summary.verifiedDoctors || 0, detail: 'Comptes actifs', tone: 'success', to: '/dashboard/admin/doctors?status=VERIFIED' },
+    { label: 'Médecins en attente', value: summary.pendingDoctors || 0, detail: 'Dossiers à examiner', tone: 'warning', to: '/dashboard/admin/doctors?status=PENDING' },
+    { label: 'Avis à valider', value: summary.pendingReviews || 0, detail: 'Modération requise', tone: 'info', to: '/dashboard/admin/reviews' },
+    { label: 'RDV complétés', value: summary.completedAppointments || 0, detail: 'Consultations terminées', tone: 'neutral', to: '/dashboard/admin/appointments?status=COMPLETE' },
   ];
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <MotionCard key={card.label} className="space-y-2">
+          <MotionCard
+            key={card.label}
+            className="space-y-2 cursor-pointer hover:border-med-primary/40 transition-all hover:shadow-md active:scale-95"
+            onClick={() => navigate(card.to)}
+          >
             <p className="text-sm text-slate-500">{card.label}</p>
             <p className="text-3xl font-bold text-slate-900">{card.value}</p>
             <Badge variant={summaryTone[card.tone] || 'neutral'}>{card.detail}</Badge>
           </MotionCard>
         ))}
       </div>
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-3">
@@ -180,34 +158,6 @@ function AdminOverviewPage() {
           </div>
         </Card>
       </div>
-
-      <Card className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-slate-900">Demandes de modification patient (profil)</p>
-          <Badge variant="warning">{patientRequestsQuery.data?.pagination?.total || 0}</Badge>
-        </div>
-        {patientRequestsQuery.isLoading ? (
-          <Skeleton className="h-24" />
-        ) : (
-          <div className="space-y-2">
-            {(patientRequestsQuery.data?.items || []).map((req) => (
-              <div key={req.id} className="rounded-xl bg-slate-50 px-3 py-2">
-                <p className="text-sm font-semibold text-slate-900">{req.patientEmail || 'Patient'}</p>
-                <p className="text-xs text-slate-500">{new Date(req.createdAt).toLocaleString('fr-MA')}</p>
-                <p className="text-sm text-slate-700">{req.reason}</p>
-                <pre className="mt-2 overflow-x-auto rounded-lg bg-white p-2 text-xs text-slate-600">{JSON.stringify(req.payload, null, 2)}</pre>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => approvePatientReq.mutate(req.id)} disabled={approvePatientReq.isPending}>Approuver</Button>
-                  <Button size="sm" variant="outline" onClick={() => rejectPatientReq.mutate(req.id)} disabled={rejectPatientReq.isPending}>Rejeter</Button>
-                </div>
-              </div>
-            ))}
-            {!(patientRequestsQuery.data?.items || []).length ? (
-              <p className="text-sm text-slate-600">Aucune demande en attente.</p>
-            ) : null}
-          </div>
-        )}
-      </Card>
     </div>
   );
 }

@@ -55,12 +55,8 @@ const searchPlaceholders = [
   'pédiatre Rabat...',
 ];
 
-const homeHeroImage =
-  'https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=740&q=80';
-const homeHeroImageSrcSet =
-  'https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=740&q=80 360w, https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=740&q=80 740w, https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=1060&q=80 1060w, https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=1480&q=80 1480w, https://img.freepik.com/premium-photo/woman-pink-shirt-with-stethoscope-her-neck_862335-28814.jpg?ga=GA1.1.1257380270.1777040988&semt=ais_hybrid&w=2000&q=80 2000w';
-
 const fallbackHomeData = {
+
   stats: [],
   specialties: [],
   hotspots: [],
@@ -470,144 +466,82 @@ function HomePage() {
       <MotionSection
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-[32px] border border-white/80 bg-gradient-to-br from-white via-[#f8fbff] to-[#fff3f7] p-6 shadow-xl shadow-med-primary/10 backdrop-blur md:p-10"
+        transition={{ duration: 0.55 }}
+        className="relative overflow-hidden rounded-[40px] bg-white shadow-2xl shadow-slate-200/50"
       >
-        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#f5bdd3]/35 blur-3xl" />
-        <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#b9eef0]/35 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_transparent_48%)]" />
-
-        <div className="relative grid gap-10 lg:grid-cols-[1.05fr,0.95fr] lg:items-center">
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="info">Plateforme médicale marocaine connectée à la base</Badge>
-              <span className="inline-flex items-center gap-2 rounded-full border border-pink-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
-                <Sparkles size={14} className="text-[#D95A8A]" />
-                Expérience plus douce
-              </span>
+        <div className="flex flex-col lg:flex-row">
+          {/* Left Content */}
+          <div className="flex flex-1 flex-col justify-center p-8 md:p-12 lg:p-16">
+            <div className="mb-6 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#1A6B8A]">
+              <ShieldCheck size={16} className="text-[#1A6B8A]" />
+              Plateforme Certifiée
             </div>
 
-            <div className="space-y-4">
-              <h1 className="max-w-2xl text-4xl font-black tracking-tight text-slate-900 md:text-6xl">
-                Le rendez-vous médical, plus fluide et plus rassurant
+            <div className="space-y-6">
+              <h1 className="text-5xl font-black leading-[1.1] tracking-tight text-slate-900 md:text-7xl">
+                Trouvez votre <br />
+                <span className="bg-gradient-to-r from-[#1A6B8A] to-[#2ecc71] bg-clip-text text-transparent">médecin</span> <br />
+                au Maroc
               </h1>
-              <p className="max-w-xl text-base leading-relaxed text-slate-600 md:text-lg">
-                Recherchez un spécialiste, comparez les cabinets et réservez en quelques secondes depuis une interface pensée comme une vitrine premium.
+              <p className="max-w-md text-base leading-relaxed text-slate-500 md:text-lg">
+                Des milliers de médecins vérifiés. Prenez rendez-vous en ligne, en cabinet ou en téléconsultation.
               </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              {heroPills.map(({ label, Icon }) => (
-                <div
-                  key={label}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
-                >
-                  <Icon size={14} className="text-med-primary" />
-                  {label}
-                </div>
-              ))}
             </div>
 
             <form
               onSubmit={handleSubmit(onSearchSubmit)}
-              className="space-y-4 rounded-[32px] border border-white/80 bg-white/90 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-sm md:p-5"
+              className="mt-10 space-y-4"
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),240px]">
-                <Input
-                  id="home-query"
-                  label="Symptôme ou spécialité"
-                  placeholder={searchPlaceholders[placeholderIndex]}
-                  error={errors.query?.message}
-                  className="min-h-[52px] rounded-[10px] border-slate-300 text-base focus:border-[#1A6B8A] focus:ring-[#1A6B8A]/30"
-                  {...register('query')}
-                />
-                <div className="space-y-1.5">
-                  <label htmlFor="home-city" className="text-sm font-medium text-slate-700">
-                    Ville disponible
-                  </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[280px]">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    {...register('query')}
+                    className="h-[58px] w-full rounded-2xl border border-slate-100 bg-slate-50/50 pl-12 pr-4 text-base focus:border-[#1A6B8A] focus:outline-none focus:ring-4 focus:ring-[#1A6B8A]/10 placeholder:text-slate-400"
+                    placeholder="pédiatre Rabat..."
+                  />
+                  {errors.query && <p className="mt-1 text-xs text-red-500">{errors.query.message}</p>}
+                </div>
+
+                <div className="relative w-full md:w-[200px]">
                   <select
-                    id="home-city"
-                    className="h-[52px] w-full rounded-[10px] border border-slate-300 bg-white/90 px-3.5 text-base text-slate-800 shadow-sm transition-all duration-200 placeholder:text-slate-400 focus:border-[#1A6B8A] focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30"
-                    defaultValue=""
                     {...register('ville')}
+                    className="h-[58px] w-full appearance-none rounded-2xl border border-slate-100 bg-slate-50/50 px-4 pr-10 text-base focus:border-[#1A6B8A] focus:outline-none focus:ring-4 focus:ring-[#1A6B8A]/10"
+                    defaultValue=""
                   >
-                    <option value="" disabled>
-                      Choisir une ville
-                    </option>
-                    {cityOptions.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
+                    <option value="" disabled>Toutes les villes</option>
+                    {cityOptions.map(city => <option key={city} value={city}>{city}</option>)}
                   </select>
-                  {errors.ville ? <p className="text-xs text-red-600">{errors.ville.message}</p> : null}
+                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <ChevronRight size={16} className="rotate-90" />
+                  </div>
+                  {errors.ville && <p className="mt-1 text-xs text-red-500">{errors.ville.message}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  className="h-[52px] gap-2 bg-[#1A6B8A] px-7 font-medium text-white hover:bg-[#15556d] focus-visible:ring-[#1A6B8A]"
-                  type="submit"
-                >
-                  <Search size={16} />
-                  Rechercher un médecin
-                </Button>
-                <Link to="/dashboard/patient">
-                  <Button variant="outline" className="h-[52px] gap-1 px-6 font-medium">
-                    Mon espace patient
-                    <ChevronRight size={16} />
-                  </Button>
-                </Link>
-                <p className="text-xs font-medium text-slate-500">Résultats connectés à la base en temps réel.</p>
-              </div>
+              <Button
+                type="submit"
+                className="h-[58px] gap-3 rounded-2xl bg-[#005c73] px-10 text-base font-bold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Search size={20} />
+                Rechercher un médecin
+              </Button>
             </form>
           </div>
 
-          <div className="relative mx-auto w-full max-w-[540px]">
-            <div className="pointer-events-none absolute inset-x-8 top-10 h-[78%] rounded-[40px] bg-[#1A6B8A]/10 blur-3xl" />
-
-            <div className="relative rounded-[40px] border border-white/70 bg-white/80 p-4 shadow-2xl shadow-slate-900/10 backdrop-blur">
-              <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#f7bfd4]/35 via-white to-[#d3f2f1]/45 p-3">
-                <img
-                  src={homeHeroImage}
-                  srcSet={homeHeroImageSrcSet}
-                  sizes="(min-width: 1024px) 540px, 100vw"
-                  alt="Médecin souriante en haut rose avec stéthoscope"
-                  className="h-[430px] w-full rounded-[28px] object-cover object-center"
-                  loading="eager"
-                  decoding="async"
-                />
-                <div className="absolute left-6 top-6 inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg shadow-slate-900/10">
-                  <CalendarDays size={14} className="text-med-primary" />
-                  Agenda synchronisé
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <CalendarDays size={16} className="text-med-primary" />
-                    Réservation fluide
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                    Les disponibilités remontent en temps réel pour simplifier la prise de rendez-vous.
-                  </p>
-                </div>
-
-                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Star size={16} className="fill-[#F4A62A] text-[#F4A62A]" />
-                    Confiance visible
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                    Des profils vérifiés, une lecture claire et une présentation plus rassurante.
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Right Image */}
+          <div className="relative hidden w-full bg-[#E5F6F6] lg:block lg:w-[45%]">
+            <img
+              src="/docs/screenshots/couverture_tabibconnect.jpeg"
+              alt="TabibConnect - Votre plateforme de santé"
+              className="h-full w-full object-cover object-center"
+              loading="eager"
+            />
           </div>
+
         </div>
       </MotionSection>
+
 
       <MotionSection
         ref={statsRef}
@@ -741,29 +675,75 @@ function HomePage() {
           <p className="text-sm text-slate-600">Les points chauds sont dérivés des cabinets et médecins enregistrés.</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <motion.div 
+          className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
+          variants={{
+            hidden: { opacity: 0 },
+            show: {
+              opacity: 1,
+              transition: {
+                staggerChildren: 0.1
+              }
+            }
+          }}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.2 }}
+        >
           {formattedHotspots.map((hotspot) => (
-            <Link
+            <motion.div
               key={hotspot.ville}
-              to={`/search?ville=${encodeURIComponent(hotspot.ville)}`}
-              className="group block"
+              variants={{
+                hidden: { opacity: 0, y: 20 },
+                show: { opacity: 1, y: 0 }
+              }}
             >
-              <Card className="relative overflow-hidden space-y-2 rounded-[24px] border border-slate-200 bg-white/95 p-5 shadow-sm transition duration-200 group-hover:scale-[1.02] group-hover:border-[#1A6B8A] group-hover:shadow-lg">
-                <span className="pointer-events-none absolute -right-3 -top-2 select-none text-[6rem] font-black leading-none text-slate-900 opacity-[0.04]">
-                  {hotspot.ville?.charAt(0)?.toUpperCase() || 'M'}
-                </span>
-                <div className="relative flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{hotspot.ville}</h3>
-                    <p className="text-sm text-slate-600">{hotspot.label || 'Cabinets médicaux actifs'}</p>
+              <Link
+                to={`/search?ville=${encodeURIComponent(hotspot.ville)}`}
+                className="group block h-full"
+              >
+                <Card className="relative h-full overflow-hidden space-y-4 rounded-[32px] border border-slate-200 bg-white/95 p-7 shadow-sm transition-all duration-300 group-hover:border-med-primary group-hover:shadow-xl group-hover:shadow-med-primary/5">
+                  <span className="pointer-events-none absolute -right-4 -top-4 select-none text-[8rem] font-black leading-none text-slate-900 opacity-[0.03] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:opacity-[0.05]">
+                    {hotspot.ville?.charAt(0)?.toUpperCase() || 'M'}
+                  </span>
+                  
+                  <div className="relative flex items-start justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-slate-900 group-hover:text-med-primary transition-colors">
+                          {hotspot.ville}
+                        </h3>
+                        <div className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-med-primary opacity-75"></span>
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-med-primary"></span>
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium text-slate-500">
+                        {hotspot.label || 'Cabinets médicaux actifs'}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="info">{hotspot.doctorsCount} médecins</Badge>
-                </div>
-                <p className="relative text-xs text-slate-500">{hotspot.cabinetsCount} cabinets connectés</p>
-              </Card>
-            </Link>
+
+                  <div className="relative mt-4 flex items-center gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-lg font-black text-slate-900">{hotspot.doctorsCount}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Médecins</span>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div className="flex flex-col">
+                      <span className="text-lg font-black text-slate-900">{hotspot.cabinetsCount}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cabinets</span>
+                    </div>
+                    <div className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition-colors group-hover:bg-med-primary group-hover:text-white">
+                      <ChevronRight size={18} />
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
+
       </section>
 
       <section className="space-y-4">

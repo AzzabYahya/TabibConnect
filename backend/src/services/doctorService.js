@@ -77,82 +77,142 @@ const enrichDoctor = (doctor, ratingSummary) => {
 };
 
 const listDoctors = async (filters) => {
-  const where = {
-    user: {
-      isVerified: true,
+  const andClauses = [
+    {
+      user: {
+        isVerified: true,
+      },
     },
-  };
+  ];
 
   if (filters.q) {
-    where.OR = [
-      {
-        nomComplet: {
-          contains: filters.q,
-          mode: 'insensitive',
-        },
-      },
-      {
-        specialite: {
-          contains: filters.q,
-          mode: 'insensitive',
-        },
-      },
-      {
-        user: {
-          email: {
-            contains: filters.q,
-            mode: 'insensitive',
-          },
-        },
-      },
-    ];
+    const parts = filters.q.trim().split(/\s+/).filter(Boolean);
+    parts.forEach((part) => {
+      andClauses.push({
+        OR: [
+          { nomComplet: { contains: part, mode: 'insensitive' } },
+          { specialite: { contains: part, mode: 'insensitive' } },
+          { user: { email: { contains: part, mode: 'insensitive' } } },
+        ],
+      });
+    });
   }
+
 
   if (filters.specialite) {
-    where.specialite = {
-      contains: filters.specialite,
-      mode: 'insensitive',
-    };
+    andClauses.push({
+      specialite: {
+        contains: filters.specialite,
+        mode: 'insensitive',
+      },
+    });
   }
 
-  if (filters.accepteAssurance !== undefined) {
-    where.accepteAssurance = toBoolean(filters.accepteAssurance);
+  if (toBoolean(filters.accepteAssurance)) {
+    andClauses.push({
+      accepteAssurance: true,
+    });
   }
 
-  if (filters.maxTarif !== undefined) {
-    where.tarifConsultation = {
-      lte: new Prisma.Decimal(filters.maxTarif),
-    };
+
+  if (filters.maxTarif !== undefined && Number(filters.maxTarif) < 2000) {
+    andClauses.push({
+      tarifConsultation: {
+        lte: new Prisma.Decimal(filters.maxTarif),
+      },
+    });
   }
 
   if (filters.langue) {
-    where.languesParlees = {
-      has: filters.langue,
-    };
+    andClauses.push({
+      languesParlees: {
+        has: filters.langue,
+      },
+    });
   }
 
   if (filters.ville) {
-    where.doctorCabinets = {
-      some: {
-        cabinet: {
-          ville: {
-            contains: filters.ville,
-            mode: 'insensitive',
+    andClauses.push({
+      doctorCabinets: {
+        some: {
+          cabinet: {
+            ville: {
+              contains: filters.ville,
+              mode: 'insensitive',
+            },
           },
         },
       },
-    };
+    });
   }
 
+  if (toBoolean(filters.videoOnly)) {
+    andClauses.push({
+      OR: [
+        { bio: { contains: 'tele', mode: 'insensitive' } },
+        { experience: { gte: 8 } },
+      ],
+    });
+  }
+
+  const where = { AND: andClauses };
+
+  // Fetch all potential matches to apply post-fetch filters (sexe, minNote) 
+  // while maintaining correct pagination.
+  const allDoctors = await prisma.doctor.findMany({
+    where,
+    select: {
+      id: true,
+      nomComplet: true,
+      specialite: true,
+      experience: true,
+      tarifConsultation: true,
+      accepteAssurance: true,
+      bio: true,
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+
+  const allDoctorIds = allDoctors.map((d) => d.id);
+  const ratingSummary = await getDoctorRatingSummary(allDoctorIds);
+
+  // Helper for gender inference (matching frontend logic)
+  const inferGender = (doc) => {
+    const text = `${doc.nomComplet || ''} ${doc.user?.email || ''}`.toLowerCase();
+    if (/(salma|khadija|fatima|meryem|nadia|laila|sanae|mina|hajar)/.test(text)) return 'FEMME';
+    if (/(amine|youssef|omar|hamza|karim|hicham|mehdi|younes|mohamed|abdel)/.test(text)) return 'HOMME';
+    return 'TOUT';
+  };
+
+  // Apply in-memory filters
+  let filteredResults = allDoctors.map(doc => {
+    const rating = ratingSummary.get(doc.id) || { average: 0, count: 0 };
+    return { ...doc, rating, inferredSexe: inferGender(doc) };
+  });
+
+  if (filters.sexe && filters.sexe !== 'TOUT') {
+    filteredResults = filteredResults.filter(d => d.inferredSexe === filters.sexe);
+  }
+
+  if (filters.minNote && Number(filters.minNote) > 0) {
+    filteredResults = filteredResults.filter(d => d.rating.average >= Number(filters.minNote));
+  }
+
+  const total = filteredResults.length;
   const page = Math.max(1, Number(filters.page || 1));
   const limit = Math.max(1, Number(filters.limit || 8));
   const skip = (page - 1) * limit;
 
-  const total = await prisma.doctor.count({ where });
+  const pagedResults = filteredResults.slice(skip, skip + limit);
+  const pagedIds = pagedResults.map(d => d.id);
+
+  // Fetch full data for the paged results
   const doctors = await prisma.doctor.findMany({
-    where,
-    skip,
-    take: limit,
+    where: { id: { in: pagedIds } },
     include: {
       user: {
         select: {
@@ -164,26 +224,20 @@ const listDoctors = async (filters) => {
       },
       doctorCabinets: {
         include: {
-          cabinet: {
-            select: {
-              id: true,
-              nom: true,
-              ville: true,
-              quartier: true,
-              latitude: true,
-              longitude: true,
-            },
-          },
+          cabinet: true,
         },
       },
     },
-    orderBy: [{ createdAt: 'desc' }],
   });
 
-  const doctorIds = doctors.map((doctor) => doctor.id);
+  // Re-sort doctors to match pagedIds order
+  const doctorsMap = new Map(doctors.map(d => [d.id, d]));
+  const sortedDoctors = pagedIds.map(id => doctorsMap.get(id)).filter(Boolean);
+
+  // Enrich with photos and final ratings
   const profilePhotos = await prisma.doctorDocument.findMany({
     where: {
-      doctorId: { in: doctorIds },
+      doctorId: { in: pagedIds },
       mimeType: { startsWith: 'image/' },
     },
     select: {
@@ -202,8 +256,7 @@ const listDoctors = async (filters) => {
     }
   }
 
-  const ratingSummary = await getDoctorRatingSummary(doctorIds);
-  let results = doctors.map((doctor) => {
+  const finalResults = sortedDoctors.map((doctor) => {
     const enriched = enrichDoctor(doctor, ratingSummary);
     const profilePhoto = profilePhotoByDoctorId.get(doctor.id);
 
@@ -213,15 +266,10 @@ const listDoctors = async (filters) => {
     };
   });
 
-  if (filters.minNote !== undefined) {
-    const minNote = Number(filters.minNote);
-    results = results.filter((doctor) => doctor.rating.average >= minNote);
-  }
-
   if (toBoolean(filters.availableToday)) {
     const todayISO = new Date().toISOString().slice(0, 10);
     const availabilityChecks = await Promise.all(
-      results.map(async (doctor) => {
+      finalResults.map(async (doctor) => {
         const available = await doctorHasAvailabilityOnDate({
           doctorId: doctor.id,
           dateISO: todayISO,
@@ -231,13 +279,21 @@ const listDoctors = async (filters) => {
       })
     );
 
-    results = availabilityChecks
-      .filter((entry) => entry.available)
-      .map((entry) => entry.doctor);
+    return {
+      items: availabilityChecks
+        .filter((entry) => entry.available)
+        .map((entry) => entry.doctor),
+      pagination: {
+        page,
+        limit,
+        total: availabilityChecks.filter((e) => e.available).length,
+        pages: Math.ceil(total / limit),
+      },
+    };
   }
 
   return {
-    items: results,
+    items: finalResults,
     pagination: {
       page,
       limit,
@@ -337,72 +393,12 @@ const searchDoctors = async (queryFilters) => {
   }
 
   const suggestedSpecialties = suggestSpecialties(normalizedQuery);
+  const queryPattern = `%${normalizedQuery}%`;
+  const specialtiesArray = suggestedSpecialties.length > 0 ? suggestedSpecialties : [''];
 
-  // We need to get the total count for search as well. 
-  // Since search involves merging full-text, name fallback, and specialty suggestions,
-  // it's complex to get a precise 'total' without running the full merge logic.
-  // For now, we'll implement a simplified version or just return a fixed large number if results exist.
-  // Real implementation would ideally use a more unified SQL query.
-
-  const fullTextResults = await prisma.$queryRaw`
-    SELECT
-      d.id,
-      d."nomComplet",
-      d.specialite,
-      d.bio,
-      d."tarifConsultation",
-      d.experience,
-      d."accepteAssurance",
-      d."languesParlees",
-      u.email,
-      ts_rank(
-        to_tsvector(
-          'simple',
-          concat_ws(
-            ' ',
-            coalesce(d."nomComplet", ''),
-            coalesce(d.specialite, ''),
-            coalesce(d.bio, ''),
-            coalesce(u.email, '')
-          )
-        ),
-        plainto_tsquery('simple', ${normalizedQuery})
-      ) AS rank
-    FROM "Doctor" d
-    INNER JOIN "User" u ON u.id = d."userId"
-    WHERE to_tsvector(
-      'simple',
-      concat_ws(
-        ' ',
-        coalesce(d."nomComplet", ''),
-        coalesce(d.specialite, ''),
-        coalesce(d.bio, ''),
-        coalesce(u.email, '')
-      )
-    ) @@ plainto_tsquery('simple', ${normalizedQuery})
-    AND u."isVerified" = true
-    ORDER BY rank DESC
-    LIMIT 100
-  `;
-
-  const mappedFullText = fullTextResults.map((row) => ({
-    id: row.id,
-    nomComplet: row.nomComplet,
-    specialite: row.specialite,
-    bio: row.bio,
-    tarifConsultation: Number(row.tarifConsultation),
-    experience: row.experience,
-    accepteAssurance: row.accepteAssurance,
-    languesParlees: row.languesParlees,
-    email: row.email,
-    rank: Number(row.rank),
-  }));
-
-  // ILIKE fallback for name/firstname search when full-text gives few results
-  let nameFallback = [];
-  if (mappedFullText.length < 5) {
-    const queryPattern = `%${normalizedQuery}%`;
-    nameFallback = await prisma.$queryRaw`
+  // Unified Search Query
+  const results = await prisma.$queryRaw`
+    WITH RankedDoctors AS (
       SELECT
         d.id,
         d."nomComplet",
@@ -412,148 +408,104 @@ const searchDoctors = async (queryFilters) => {
         d.experience,
         d."accepteAssurance",
         d."languesParlees",
-        u.email
+        d.diplomes,
+        d."assurancesAcceptees",
+        u.email,
+        (
+          ts_rank(
+            to_tsvector('simple', concat_ws(' ', coalesce(d."nomComplet", ''), coalesce(d.specialite, ''), coalesce(d.bio, ''), coalesce(u.email, ''))),
+            plainto_tsquery('simple', ${normalizedQuery})
+          ) * 10 +
+          CASE WHEN d."nomComplet" ILIKE ${queryPattern} THEN 5 ELSE 0 END +
+          CASE WHEN u.email ILIKE ${queryPattern} THEN 3 ELSE 0 END +
+          CASE WHEN d.specialite ANY(ARRAY[${Prisma.join(specialtiesArray)}]) THEN 4 ELSE 0 END
+        ) AS rank
       FROM "Doctor" d
       INNER JOIN "User" u ON u.id = d."userId"
-      WHERE (d."nomComplet" ILIKE ${queryPattern} OR u.email ILIKE ${queryPattern})
-      AND u."isVerified" = true
-      ORDER BY d."nomComplet" ASC
-      LIMIT 100
-    `;
-  }
+      WHERE u."isVerified" = true
+      AND (
+        to_tsvector('simple', concat_ws(' ', coalesce(d."nomComplet", ''), coalesce(d.specialite, ''), coalesce(d.bio, ''), coalesce(u.email, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
+        OR d."nomComplet" ILIKE ${queryPattern}
+        OR u.email ILIKE ${queryPattern}
+        OR d.specialite ANY(ARRAY[${Prisma.join(specialtiesArray)}])
+      )
+    )
+    SELECT * FROM RankedDoctors
+    ORDER BY rank DESC
+    LIMIT ${limit} OFFSET ${skip}
+  `;
 
-  const mappedNameFallback = nameFallback.map((row) => ({
-    id: row.id,
-    nomComplet: row.nomComplet,
-    specialite: row.specialite,
-    bio: row.bio,
-    tarifConsultation: Number(row.tarifConsultation),
-    experience: row.experience,
-    accepteAssurance: row.accepteAssurance,
-    languesParlees: row.languesParlees,
-    email: row.email,
-    rank: 0,
-  }));
+  // Count Query
+  const countResult = await prisma.$queryRaw`
+    SELECT COUNT(*)::int as total
+    FROM "Doctor" d
+    INNER JOIN "User" u ON u.id = d."userId"
+    WHERE u."isVerified" = true
+    AND (
+      to_tsvector('simple', concat_ws(' ', coalesce(d."nomComplet", ''), coalesce(d.specialite, ''), coalesce(d.bio, ''), coalesce(u.email, ''))) @@ plainto_tsquery('simple', ${normalizedQuery})
+      OR d."nomComplet" ILIKE ${queryPattern}
+      OR u.email ILIKE ${queryPattern}
+      OR d.specialite ANY(ARRAY[${Prisma.join(specialtiesArray)}])
+    )
+  `;
 
-  let specialtyFallback = [];
+  const total = countResult[0]?.total || 0;
+  const doctorIds = results.map((d) => d.id);
 
-  if (suggestedSpecialties.length) {
-    specialtyFallback = await prisma.doctor.findMany({
-      where: {
-        OR: suggestedSpecialties.map((speciality) => ({
-          specialite: {
-            contains: speciality,
-            mode: 'insensitive',
-          },
-        })),
-        user: { isVerified: true },
-      },
-      include: {
-        user: {
-          select: {
-            email: true,
-          },
-        },
-      },
-      take: 100,
-    });
-  }
-
-  const fallbackMapped = specialtyFallback.map((doctor) => ({
-    id: doctor.id,
-    nomComplet: doctor.nomComplet,
-    specialite: doctor.specialite,
-    bio: doctor.bio,
-    tarifConsultation: Number(doctor.tarifConsultation),
-    experience: doctor.experience,
-    accepteAssurance: doctor.accepteAssurance,
-    languesParlees: doctor.languesParlees,
-    email: doctor.user.email,
-    rank: 0,
-    suggestionMatch: true,
-  }));
-
-  const merged = new Map();
-
-  [...mappedFullText, ...mappedNameFallback, ...fallbackMapped].forEach((doctor) => {
-    if (!merged.has(doctor.id)) {
-      merged.set(doctor.id, doctor);
-    }
-  });
-
-  const allMergedResults = Array.from(merged.values());
-  const total = allMergedResults.length;
-  
-  // Apply pagination to the merged list
-  const paginatedResults = allMergedResults.slice(skip, skip + limit);
-
-  // Enrich only the paginated results with profilePhotoUrl and ratings
-  const doctorIds = paginatedResults.map((doctor) => doctor.id);
-
-  const profilePhotos = await prisma.doctorDocument.findMany({
-    where: {
-      doctorId: { in: doctorIds },
-      mimeType: { startsWith: 'image/' },
-    },
-    select: {
-      id: true,
-      doctorId: true,
-      isProfilePhoto: true,
-      createdAt: true,
-    },
-    orderBy: [{ doctorId: 'asc' }, { isProfilePhoto: 'desc' }, { createdAt: 'desc' }],
-  });
-
-  const profilePhotoByDoctorId = new Map();
-  for (const doc of profilePhotos) {
-    if (!profilePhotoByDoctorId.has(doc.doctorId)) {
-      profilePhotoByDoctorId.set(doc.doctorId, doc);
-    }
-  }
-
-  const ratingSummary = await getDoctorRatingSummary(doctorIds);
-
-  // Fetch cabinet GPS data for map markers
-  const doctorCabinetsData = await prisma.doctorCabinet.findMany({
-    where: { doctorId: { in: doctorIds } },
-    include: {
-      cabinet: {
-        select: {
-          id: true,
-          nom: true,
-          ville: true,
-          quartier: true,
-          latitude: true,
-          longitude: true,
-        },
-      },
-    },
-  });
-
-  const cabinetsByDoctorId = new Map();
-  for (const dc of doctorCabinetsData) {
-    if (!cabinetsByDoctorId.has(dc.doctorId)) {
-      cabinetsByDoctorId.set(dc.doctorId, []);
-    }
-    cabinetsByDoctorId.get(dc.doctorId).push(dc);
-  }
-
-  const enrichedResults = paginatedResults.map((doctor) => {
-    const photo = profilePhotoByDoctorId.get(doctor.id);
-    const rating = ratingSummary.get(doctor.id) || { average: 0, count: 0 };
+  if (!doctorIds.length) {
     return {
-      ...doctor,
-      profilePhotoUrl: photo ? `/doctors/${doctor.id}/profile-photo?v=${photo.id}` : null,
+      query: normalizedQuery,
+      suggestedSpecialties,
+      items: [],
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  // Enrich results (Photos, Ratings, Cabinets)
+  const [profilePhotos, ratingSummary, doctorCabinetsData] = await Promise.all([
+    prisma.doctorDocument.findMany({
+      where: { doctorId: { in: doctorIds }, mimeType: { startsWith: 'image/' } },
+      select: { id: true, doctorId: true, isProfilePhoto: true, createdAt: true },
+      orderBy: [{ doctorId: 'asc' }, { isProfilePhoto: 'desc' }, { createdAt: 'desc' }],
+    }),
+    getDoctorRatingSummary(doctorIds),
+    prisma.doctorCabinet.findMany({
+      where: { doctorId: { in: doctorIds } },
+      include: {
+        cabinet: {
+          select: { id: true, nom: true, ville: true, quartier: true, latitude: true, longitude: true },
+        },
+      },
+    }),
+  ]);
+
+  const photoMap = new Map();
+  profilePhotos.forEach(p => { if (!photoMap.has(p.doctorId)) photoMap.set(p.doctorId, p); });
+
+  const cabinetMap = new Map();
+  doctorCabinetsData.forEach(dc => {
+    if (!cabinetMap.has(dc.doctorId)) cabinetMap.set(dc.doctorId, []);
+    cabinetMap.get(dc.doctorId).push(dc);
+  });
+
+  const enrichedItems = results.map((d) => {
+    const photo = photoMap.get(d.id);
+    const rating = ratingSummary.get(d.id) || { average: 0, count: 0 };
+    return {
+      ...d,
+      tarifConsultation: Number(d.tarifConsultation),
+      profilePhotoUrl: photo ? `/doctors/${d.id}/profile-photo?v=${photo.id}` : null,
       ratingAverage: rating.average,
       ratingCount: rating.count,
-      doctorCabinets: cabinetsByDoctorId.get(doctor.id) || [],
+      doctorCabinets: cabinetMap.get(d.id) || [],
     };
   });
+
 
   return {
     query: normalizedQuery,
     suggestedSpecialties,
-    items: enrichedResults,
+    items: enrichedItems,
     pagination: {
       page,
       limit,
@@ -1231,6 +1183,66 @@ const getDoctorPatientHistory = async ({ userId, patientId, page = 1, limit = 20
   };
 };
 
+const getDoctorPatientProfile = async ({ userId, patientId }) => {
+  const doctor = await prisma.doctor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (!doctor) {
+    throw new HttpError(404, 'Doctor profile not found');
+  }
+
+  // Security: Check if doctor has ever had an appointment with this patient
+  const hasRelationship = await prisma.rendezVous.findFirst({
+    where: {
+      doctorId: doctor.id,
+      patientId: patientId,
+    },
+  });
+
+  if (!hasRelationship) {
+    throw new HttpError(403, 'You do not have a medical relationship with this patient');
+  }
+
+  const patient = await prisma.patient.findUnique({
+    where: { id: patientId },
+    include: {
+      user: {
+        select: {
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  });
+
+  if (!patient) {
+    throw new HttpError(404, 'Patient not found');
+  }
+
+  const toDisplayName = (email) => {
+    const local = String(email || '').split('@')[0].trim();
+    const parts = local.split(/[._\s-]+/).filter(Boolean);
+    return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || 'Patient';
+  };
+
+  return {
+    id: patient.id,
+    nomComplet: toDisplayName(patient.user?.email),
+    email: patient.user?.email,
+    phone: patient.user?.phone,
+    dateOfNaissance: patient.dateOfNaissance,
+    sexe: patient.sexe,
+    adresse: patient.adresse,
+    ville: patient.ville,
+    groupeSanguin: patient.groupeSanguin,
+    antecedents: patient.antecedents,
+    lastVisitAt: hasRelationship.dateHeure,
+  };
+};
+
+
 const getDoctorStats = async ({ userId }) => {
   const doctor = await prisma.doctor.findUnique({
     where: { userId },
@@ -1313,5 +1325,7 @@ module.exports = {
   listDoctorPatients,
   getDoctorReceivedReviews,
   getDoctorPatientHistory,
+  getDoctorPatientProfile,
   getDoctorStats,
 };
+
