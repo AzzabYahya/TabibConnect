@@ -1,7 +1,7 @@
 # TabibConnect — Master Documentation (Source de Vérité)
 
 > **Plateforme web de prise de rendez-vous médicaux** (Patient, Médecin, Admin) — Maroc  
-> **Dernière mise à jour :** 5 mai 2026 (Audit & Hardening terminés)  
+> **Dernière mise à jour :** 20 mai 2026 (Documentation alignée sur le code)  
 > **Objectif :** Ce document centralise TOUTES les informations nécessaires pour une IA ou un développeur.
 
 ---
@@ -46,87 +46,47 @@
 ### Stack Technologique
 | Couche | Technologie |
 | :--- | :--- |
-| **Frontend** | React 18, Vite, Tailwind CSS, React Query, React Router v6 |
-| **Backend** | Node.js, Express.js |
-| **Base de données** | PostgreSQL, Prisma ORM |
-| **Temps Réel** | Socket.IO (Notifications push & refresh dashboard) |
-| **Sécurité** | JWT (Access/Refresh), Global double CSRF, Helmet, Rate Limiting |
-| **Tests** | Jest, Supertest, Vitest, Playwright |
-| **Infrastructure** | Docker, Docker Compose, Nginx Reverse Proxy |
+| **Frontend** | React 19, Vite, Tailwind CSS, React Query, React Router v6, i18next |
+| **Backend** | Node.js (Docker Node 22), Express 5, Prisma 6 |
+| **Base de données** | PostgreSQL 16 |
+| **Temps Réel** | Socket.IO (notifications temps reel) |
+| **Securite** | JWT (Access/Refresh), Double CSRF, Helmet + CSP, Rate Limiting |
+| **Jobs** | node-cron (rappels + no-show) |
+| **Paiements** | Stripe (serveur) |
+| **OCR** | tesseract.js (verification CIN) |
+| **Tests** | Jest + Supertest, Vitest, Playwright |
+| **Infra** | Docker, Docker Compose, Nginx |
 
 ### Structure des Dossiers
-- `backend/` : Logique serveur, Prisma schema, services métier, API.
-- `frontend/` : Application React, hooks personnalisés, composants UI.
-- `docs/screenshots/` : Captures d'écran de l'interface.
-- `uploads/` : Stockage des documents (CIN, photos) avec isolation sécurisée.
+- `backend/` : API Express, routes `/api/v1`, services metier, Prisma.
+- `frontend/` : App React (Vite), hooks temps reel, UI.
+- `docs/screenshots/` : Captures d'ecran UI (garder intact).
+- `uploads/` : Documents (CIN, photos) isoles et servis via controleurs.
 
 ---
 
-## 📊 Base de Données — Schéma Prisma
+## ⚙️ Demarrage rapide (developpement local)
 
-### Modèles Principaux (15 modèles)
-- **User** : Compte central (email, phone, role, refresh token hash).
-- **Patient** : Profil médical, CIN, antécédents, historique RDV.
-- **Doctor** : INPE, spécialité, tarifs, bio, cabinets, documents.
-- **Cabinet** : Localisation physique (ville, quartier, GPS).
-- **Disponibilite** : Créneaux hebdomadaires gérés par le médecin.
-- **RendezVous** : Cœur de l'app (statut: EN_ATTENTE, CONFIRME, ANNULE, COMPLETE, NO_SHOW).
-- **AuditLog** : [NOUVEAU] Trace toutes les actions administratives sensibles.
+### Option 1 — Lancer tout depuis la racine
+```bash
+npm --prefix backend install
+npm --prefix frontend install
+npm run dev
+```
+Ce script lance `npm run dev` dans `backend/` et `frontend/` en parallele.
 
----
-
-## 🌐 Routes API & Frontend
-
-### Routes API Critiques (`/api/...`)
-- `/auth` : Inscription, Connexion, Logout, Refresh, CSRF-Token.
-- `/doctors` : Recherche (ILike/Full-text), Profil, Agenda, Disponibilités.
-- `/appointments` : Création (avec transaction DB), Confirmation, Annulation, Avis.
-- `/admin` : Gestion utilisateurs, Logs, Métriques, Validation documents.
-- `/dashboard` : Endpoints agrégés pour Patient, Docteur et Admin.
-
-### Navigation Frontend
-- `/search` : Recherche globale.
-- `/dashboard/patient` : Suivi et historique.
-- `/dashboard/doctor` : Gestion de l'agenda et des patients.
-- `/dashboard/admin` : Pilotage et modération.
-
----
-
-## 🔐 Sécurité & Hardening (Audit 05/05/2026)
-
-L'audit technique du 5 mai a permis de corriger les vulnérabilités suivantes :
-1. **Global CSRF** : Protection appliquée à toutes les routes de mutation (POST/PUT/DELETE).
-2. **In-Memory CSRF** : Le jeton n'est plus dans `localStorage` mais en mémoire (protection XSS).
-3. **Path Traversal** : Serveur de fichiers sécurisé (interdiction de sortir du dossier `uploads`).
-4. **JWT Security** : Blocage du serveur en production si les secrets par défaut sont détectés.
-5. **Rate Limiting** : Protection contre le brute-force et le spam de réservations.
-6. **Audit Logging** : Traçabilité complète des actions des administrateurs.
-7. **Error Boundaries** : Gestion propre des crashs frontend pour éviter l'écran blanc.
-
----
-
-## 🤖 Guide IA — Patterns & Logique Métier
-
-- **Services Layer** : Toute la logique métier est dans `backend/src/services/`. Les contrôleurs ne font que passer les données.
-- **Transactions** : La création de rendez-vous utilise des transactions Prisma pour garantir l'intégrité (RDV + Paiement + Notification).
-- **File Serving** : Les fichiers (photos, documents) ne sont JAMAIS servis en statique. Ils passent par un contrôleur qui vérifie les permissions et normalize les chemins.
-- **Real-time** : Socket.IO est utilisé pour mettre à jour les badges de notification en temps réel.
-
----
-
-## ⚙️ Installation & Démarrage
-
-### Backend
+### Option 2 — Lancer chaque service
+**Backend**
 ```bash
 cd backend
-cp .env.example .env # Configurer DATABASE_URL, JWT_SECRET, CSRF_SECRET
+cp .env.example .env
 npm install
-npx prisma generate
-npx prisma db push
+npm run prisma:generate
+npm run prisma:migrate
 npm run dev # Port 4000
 ```
 
-### Frontend
+**Frontend**
 ```bash
 cd frontend
 npm install
@@ -135,12 +95,143 @@ npm run dev # Port 5173
 
 ---
 
+## 🧰 Configuration (variables d'environnement)
+
+### Fichiers sources
+- `backend/.env.example` : configuration locale.
+- `.env.production.example` : configuration Docker Compose (prod).
+
+### Variables principales (backend)
+- `DATABASE_URL` : chaine PostgreSQL.
+- `APP_BASE_URL` / `FRONTEND_URL` : URLs publiques.
+- `CORS_ORIGIN` : origines autorisees (liste CSV).
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` : secrets JWT (bloquants en prod si valeurs par defaut).
+- `CSRF_SECRET`, `CSRF_COOKIE_NAME`, `CSRF_HEADER_NAME` : double CSRF.
+- `REFRESH_TOKEN_COOKIE_NAME` : nom du cookie refresh.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY` : paiements.
+- `SMTP_*` : emails transactionnels.
+- `TWILIO_*` : SMS (optionnel).
+- `FREE_CANCELLATION_HOURS`, `REMINDER_HOURS_BEFORE`, `REMINDER_WINDOW_MINUTES`, `NO_SHOW_GRACE_MINUTES` : politique RDV.
+- `CIN_VERIFICATION_*` : regles OCR CIN (score, mots-cles, langue).
+
+### Variables principales (frontend)
+- `VITE_API_URL` : base API (doit pointer vers `/api/v1`).
+
+---
+
+## 🌐 API & Temps reel
+
+### Base URL
+- Dev: `http://localhost:4000/api/v1`
+- Prod: `https://votre-domaine/api/v1`
+
+### Routes API (prefixe `/api/v1`)
+- `/auth` : inscription, login, refresh, csrf-token.
+- `/home` : donnees publiques homepage.
+- `/appointments` : creation, annulation, statut, avis.
+- `/dashboard` : aggregats patient/medecin/admin.
+- `/admin` : validation docs, moderation, actions sensibles.
+- `/doctors` : recherche, profil, disponibilites.
+- `/cabinets` : gestion des cabinets.
+- `/notifications` : listing et marquage.
+- `/payments` : flux de paiement.
+- `/users` : gestion utilisateur.
+- `/patients` : profil patient.
+- `/health` : check API (retourne status + version).
+
+### CSRF + Auth
+- Le frontend recupere `GET /auth/csrf-token` puis envoie `x-csrf-token` sur les mutations.
+- Les appels utilisent `withCredentials` pour les cookies (refresh).
+
+### Temps reel (Socket.IO)
+- Authentification via access token dans le handshake.
+- Abonnement automatique au canal `user:<id>`.
+- Evenement principal: `notification:new`.
+
+---
+
+## 📊 Base de Donnees — Schéma Prisma
+
+### Modeles principaux (15)
+- **User** : compte central (role, verification).
+- **Patient** : profil medical, CIN + verifications.
+- **Doctor** : profil medecin, tarif, langues, documents.
+- **Cabinet** : localisation, coordonnees, photos.
+- **Disponibilite** : creneaux hebdomadaires.
+- **RendezVous** : noyau RDV + statut + politique.
+- **Paiement** : statut et methode.
+- **Notification** : events temps reel.
+- **Avis** : notes et commentaires verifies.
+- **DoctorCabinet** : lien N-N.
+- **DoctorPatientNote** : notes medecin-patient.
+- **DoctorDocument** : documents medecin.
+- **PatientDocument** : documents patient.
+- **DoctorChangeRequest** : demandes de modification medecin.
+- **PatientChangeRequest** : demandes de modification patient.
+
+---
+
+## 🔐 Securite & Hardening (Audit 05/05/2026)
+
+- Double CSRF global sur toutes les mutations.
+- Secrets par defaut refuses en production.
+- CSP active via Helmet (scripts/styles/fonts/images controles).
+- CORS strict selon `CORS_ORIGIN`.
+- Rate limiting sur l'authentification.
+- Sanitisation d'entree via middleware.
+- Logs d'audit cote admin et suivi des documents.
+
+---
+
+## 🧪 Tests
+
+### Backend
+```bash
+npm --prefix backend test
+npm --prefix backend test:watch
+npm --prefix backend test:coverage
+npm --prefix backend test:etape5:mvp
+```
+
+### Frontend
+```bash
+npm --prefix frontend test
+npm --prefix frontend test:watch
+npm --prefix frontend test:e2e
+```
+
+---
+
+## 🐳 Docker & Production
+
+1. Copier `.env.production.example` en `.env.production`.
+2. Ajuster secrets, URLs et `VITE_API_URL`.
+3. Lancer:
+```bash
+docker compose up -d --build
+```
+
+Services: Postgres, Redis, Backend (4000), Frontend (Nginx), Nginx reverse proxy + Certbot (optionnel).
+
+---
+
+## 🤖 Guide IA — Patterns & Logique Metier
+
+- **Services Layer** : logique metier dans `backend/src/services/`.
+- **Transactions** : creation RDV + paiement dans une transaction Prisma.
+- **File Serving** : documents servis par controleur (pas de static direct).
+- **Realtime** : notifications Socket.IO pour dashboards.
+
+---
+
 ## 📋 Historique & Contribution
-- **v1.0.2 (Mai 2026)** : Audit de sécurité complet, pagination de 8, hardening global.
-- **v1.0.1 (Avril 2026)** : Documentation et captures d'écran.
+
+- **v1.0.3 (Mai 2026)** : Documentation re-sync + details config.
+- **v1.0.2 (Mai 2026)** : Audit de securite complet, pagination de 8, hardening global.
+- **v1.0.1 (Avril 2026)** : Documentation et captures d'ecran.
 - **v1.0.0 (Avril 2026)** : Lancement initial (MVP).
 
-**Règles de contribution :**
-- Secrets jamais commités.
-- Tests obligatoires pour tout changement métier.
-- Utiliser `resolveImageUrl` pour tout affichage d'image venant du backend.
+**Regles de contribution :**
+- Secrets jamais commites.
+- Tests obligatoires pour tout changement metier.
+- Utiliser `resolveImageUrl` pour tout affichage d image venant du backend.
