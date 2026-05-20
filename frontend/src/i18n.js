@@ -114,117 +114,6 @@ const resources = {
       },
     },
   },
-  ar: {
-    translation: {
-      appName: 'طبيب كونيكت',
-      nav: {
-        home: 'الرئيسية',
-        search: 'البحث',
-        login: 'تسجيل الدخول',
-        register: 'إنشاء حساب',
-        patientDashboard: 'لوحة المريض',
-        doctorDashboard: 'لوحة الطبيب',
-        adminDashboard: 'لوحة الإدارة',
-      },
-      home: {
-        title: 'صحتك المغربية بأسلوب رقمي حديث',
-        subtitle: 'احجز موعدك مع أفضل الأطباء في المغرب حضوريا أو عن بعد.',
-        ctaPrimary: 'ابحث عن طبيب',
-        ctaSecondary: 'مساحة المريض',
-      },
-      search: {
-        title: 'بحث ذكي',
-        subtitle: 'ابحث حسب التخصص والمدينة مع خريطة تفاعلية للعيادات.',
-      },
-      auth: {
-        loginTitle: 'تسجيل دخول آمن',
-        registerTitle: 'إنشاء حساب مريض',
-      },
-      common: {
-        notifications: 'الإشعارات',
-        logout: 'تسجيل الخروج',
-        logoutLoading: 'جاري تسجيل الخروج...',
-        settings: 'الإعدادات',
-        mySpace: 'مساحتي',
-        administrator: 'المدير',
-        doctor: 'الطبيب',
-        patient: 'المريض',
-        error: 'خطأ',
-        retry: 'إعادة المحاولة',
-      },
-      notifications: {
-        markAllRead: 'تحديد الكل كمقروء',
-      },
-      dashboard: {
-        helloDoctor: 'مرحبا د. {{name}}',
-        helloUser: 'مرحبا {{name}}',
-        adminSubtitle: 'إدارة شاملة للمنصة',
-        doctorSubtitle: 'جدولك ونشاطك اليومي',
-        patientSubtitle: 'متابعة مواعيدك وإشعاراتك',
-        doctorTabs: {
-          agenda: 'الأجندة',
-          availability: 'التوفر',
-          patients: 'المرضى',
-          profile: 'الملف والعيادة',
-          stats: 'الإحصائيات',
-          reviews: 'التقييمات المستلمة',
-        },
-        adminMenu: {
-          overview: 'نظرة عامة',
-          users: 'المستخدمون',
-          doctors: 'الأطباء',
-          pendingReviews: 'تقييمات للمراجعة',
-          metrics: 'مؤشرات المنصة',
-          logs: 'سجل النشاط',
-          notifications: 'الإشعارات',
-        },
-        agenda: {
-          week: 'الأسبوع',
-          previous: 'السابق',
-          today: 'اليوم',
-          next: 'التالي',
-          hour: 'الوقت',
-          weekAppointments: 'مواعيد الأسبوع',
-          pending: 'قيد الانتظار',
-          confirmed: 'مؤكد',
-          completed: 'مكتمل',
-          noAppointmentsWeek: 'لا توجد مواعيد هذا الأسبوع',
-          noAppointmentsWeekHint: 'استخدم الأسهم لتغيير الأسبوع أو أضف مواعيد متاحة أكثر.',
-          close: 'إغلاق',
-          details: 'التفاصيل',
-          reason: 'السبب',
-          status: 'الحالة',
-          type: 'النوع',
-          office: 'العيادة',
-          notAvailable: 'غير متاح',
-          confirm: 'تأكيد',
-          cancel: 'إلغاء',
-          cancelReasonPlaceholder: 'سبب الإلغاء (إلزامي)...',
-          addNote: 'إضافة ملاحظة',
-          notePlaceholder: 'ملاحظة طبية...',
-          saveNote: 'حفظ الملاحظة',
-        },
-        dashboardShell: {
-          prev: 'السابق',
-          next: 'التالي',
-          noNotifications: 'لا توجد إشعارات',
-          notificationError: 'تعذر تحميل الإشعارات.',
-          markAllRead: 'تحديد الكل كمقروء',
-        },
-      },
-      appShell: {
-        platformTagline: 'المنصة الطبية المرجعية في المغرب.',
-        navigation: 'التنقل',
-        quickSpecialties: 'تخصصات سريعة',
-        contactLegal: 'التواصل والقانون',
-        support: 'الدعم 7 أيام/7',
-        privacy: 'سرية طبية محمية',
-        rights: '© 2026 طبيب كونيكت. تكنولوجيا الصحة بالمغرب.',
-        legalLine: 'إشعارات قانونية وشروط الاستخدام وسياسة الخصوصية.',
-        secureCare: 'رعاية رقمية آمنة',
-      },
-    },
-  },
   en: {
     translation: {
       appName: 'TabibConnect',
@@ -259,10 +148,6 @@ const resources = {
     },
   },
 };
-
-i18n.on('languageChanged', (lng) => {
-  document.dir = lng === 'ar' ? 'rtl' : 'ltr';
-});
 
 i18n.use(initReactI18next).init({
   resources,

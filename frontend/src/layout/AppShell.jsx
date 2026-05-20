@@ -15,7 +15,6 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 
-import LanguageSwitcher from '../components/common/LanguageSwitcher';
 import { dashboardRouteByRole, getCurrentSession } from '../lib/auth';
 import { logoutCurrentUser } from '../lib/accountActions';
 
@@ -33,9 +32,8 @@ function AppShell() {
   const isDashboardRoute = location.pathname.startsWith('/dashboard/');
 
   useEffect(() => {
-    const direction = i18n.language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
-    document.documentElement.dir = direction;
+    document.documentElement.dir = 'ltr';
   }, [i18n.language]);
 
   const navItems = [
@@ -85,7 +83,6 @@ function AppShell() {
           </nav>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <LanguageSwitcher />
             {!session.isAuthenticated ? (
               <>
                 <Link to="/connexion" className={`${headerActionClassName} border border-med-primary/30 bg-white/80 text-med-primary hover:bg-med-primary/10`}>

@@ -122,6 +122,9 @@ const getHomeSummary = async () => {
     .slice(0, 6);
 
   const citiesCount = new Set(allCabinets.map((cabinet) => cabinet.ville).filter(Boolean)).size;
+  const cities = Array.from(
+    new Set(allCabinets.map((cabinet) => cabinet.ville).filter(Boolean))
+  ).sort((left, right) => left.localeCompare(right, 'fr'));
 
   const totalVerified = await prisma.avis.count({ where: { isVerified: true } });
   const dateSeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
@@ -184,6 +187,7 @@ const getHomeSummary = async () => {
       verifiedDoctorsCount: verifiedDoctors,
       citiesCount,
     },
+    cities,
     stats: [
       { label: 'Medecins verifies', value: verifiedDoctors, suffix: '+' },
       { label: 'Patients inscrits', value: patients, suffix: '+' },

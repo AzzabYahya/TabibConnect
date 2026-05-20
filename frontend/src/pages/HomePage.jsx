@@ -409,7 +409,10 @@ function HomePage() {
   const citiesCount = Number(
     homeOverview.citiesCount ?? new Set(hotspots.map((hotspot) => hotspot.ville).filter(Boolean)).size
   );
-  const cityOptions = Array.from(new Set(hotspots.map((spot) => spot.ville).filter(Boolean)));
+  const homeCities = Array.isArray(home.cities) ? home.cities : [];
+  const cityOptions = homeCities.length
+    ? homeCities
+    : Array.from(new Set(hotspots.map((spot) => spot.ville).filter(Boolean)));
   const formatHotspotLabel = (label) => {
     const text = String(label || '').trim();
 

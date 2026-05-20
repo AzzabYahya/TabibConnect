@@ -11,6 +11,7 @@ import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 import useRealtimeDashboard from '../hooks/useRealtimeDashboard';
+import { formatAppointmentReference } from '../lib/reference';
 
 const statusClass = {
   EN_ATTENTE: 'border-amber-200 bg-amber-50 text-amber-900',
@@ -221,7 +222,7 @@ function DoctorAgendaPage() {
         <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-lg border-l bg-white p-4 shadow-2xl">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-900">RDV {selected.id}</p>
+              <p className="text-sm font-semibold text-slate-900">Reference {formatAppointmentReference(selected.id)}</p>
               <p className="text-sm text-slate-600">
                 {selected.patient?.firstName} • {new Date(selected.dateTime).toLocaleString('fr-MA')}
               </p>

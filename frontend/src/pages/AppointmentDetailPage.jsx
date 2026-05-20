@@ -12,6 +12,7 @@ import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 import { getCurrentSession } from '../lib/auth';
 import { formatAppointmentDate } from '../lib/date';
+import { formatAppointmentReference } from '../lib/reference';
 
 const TeleconsultationVideoPanel = lazy(() => import('../components/common/TeleconsultationVideoPanel'));
 
@@ -117,7 +118,7 @@ function AppointmentDetailPage() {
       <header className="space-y-2">
         <Badge variant={statusTone[appointment.status] || 'neutral'}>{appointment.status}</Badge>
         <h1 className="text-3xl font-bold text-slate-900">Détail rendez-vous</h1>
-        <p className="text-slate-600">Référence : {appointment.id}</p>
+        <p className="text-slate-600">Référence : {formatAppointmentReference(appointment.id)}</p>
       </header>
 
       <Card className="space-y-4">

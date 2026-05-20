@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
+import { formatAppointmentReference } from '../lib/reference';
 
 const statusTone = {
   EN_ATTENTE: 'warning',
@@ -92,7 +93,7 @@ function AdminAppointmentsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Ref: {rdv.id.slice(0, 10)}...
+                      Ref: {formatAppointmentReference(rdv.id)}
                     </p>
                     <p className="mt-1 text-sm font-bold text-slate-900">
                       {new Date(rdv.dateTime).toLocaleString('fr-MA')}
