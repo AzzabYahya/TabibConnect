@@ -122,4 +122,3 @@ function AdminPatientsPage() {
 }
 
 export default AdminPatientsPage;
-export default AdminPatientsPage;

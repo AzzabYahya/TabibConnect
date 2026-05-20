@@ -4,7 +4,7 @@ const app = require('../../src/app')
 
 describe('GET /api/health', () => {
   test('returns the API health payload', async () => {
-    const response = await request(app).get('/api/health')
+    const response = await request(app).get('/api/v1/health')
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({

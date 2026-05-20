@@ -1017,14 +1017,24 @@ const listDoctorPatients = async ({ userId, page = 1, limit = 15, search = '' })
   });
 
   const patientIds = grouped.map((g) => g.patientId);
-  const patients = await prisma.patient.findMany({
-    where: {
-      id: { in: patientIds },
-    },
-    include: {
-      user: { select: { email: true, phone: true } },
-    },
-  });
+  const [patients, profilePhotos] = await Promise.all([
+    prisma.patient.findMany({
+      where: {
+        id: { in: patientIds },
+      },
+      include: {
+        user: { select: { email: true, phone: true } },
+      },
+    }),
+    prisma.patientDocument.findMany({
+      where: { patientId: { in: patientIds }, isProfilePhoto: true },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['patientId'],
+      select: { patientId: true },
+    }),
+  ]);
+
+  const photoSet = new Set(profilePhotos.map((p) => p.patientId));
 
   const toFirstName = (email) => {
     const local = String(email || '').split('@')[0].trim();
@@ -1043,6 +1053,7 @@ const listDoctorPatients = async ({ userId, page = 1, limit = 15, search = '' })
         city: p.ville,
         lastVisit: g?._max?.dateHeure ? new Date(g._max.dateHeure).toISOString() : null,
         consultations: g?._count?._all || 0,
+        profilePhotoUrl: photoSet.has(p.id) ? `/patients/${p.id}/profile-photo` : null,
       };
     })
     .filter((p) => {
@@ -1227,6 +1238,12 @@ const getDoctorPatientProfile = async ({ userId, patientId }) => {
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || 'Patient';
   };
 
+  const profilePhoto = await prisma.patientDocument.findFirst({
+    where: { patientId: patient.id, isProfilePhoto: true },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+
   return {
     id: patient.id,
     nomComplet: toDisplayName(patient.user?.email),
@@ -1239,6 +1256,7 @@ const getDoctorPatientProfile = async ({ userId, patientId }) => {
     groupeSanguin: patient.groupeSanguin,
     antecedents: patient.antecedents,
     lastVisitAt: hasRelationship.dateHeure,
+    profilePhotoUrl: profilePhoto ? `/patients/${patient.id}/profile-photo` : null,
   };
 };
 

@@ -94,10 +94,3 @@ function AdminNotificationsPage() {
 }
 
 export default AdminNotificationsPage;
-        </Button >
-      </div >
-    </div >
-  );
-}
-
-export default AdminNotificationsPage;

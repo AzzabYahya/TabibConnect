@@ -9,6 +9,14 @@ import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
 
+/** Build a full URL for a patient profile photo path returned by the API. */
+const resolvePhotoUrl = (path) => {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = api.defaults.baseURL?.replace(/\/+$/, '') || '';
+  return `${base}${path.startsWith('/') ? path : '/' + path}`;
+};
+
 function DoctorPatientsPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -73,7 +81,7 @@ function DoctorPatientsPage() {
               <div key={p.id} className="rounded-2xl bg-slate-50 px-3 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex cursor-pointer items-start gap-3 hover:opacity-80" onClick={() => setProfileSelected(p)}>
-                    <Avatar name={p.firstName} size="md" />
+                    <Avatar src={resolvePhotoUrl(p.profilePhotoUrl)} name={p.firstName} size="md" />
                     <div>
                       <p className="font-semibold text-slate-900 underline-offset-4 hover:underline">{p.firstName}</p>
                       <p className="text-xs text-slate-500">{p.email}</p>
@@ -168,7 +176,7 @@ function DoctorPatientsPage() {
           ) : patientProfile ? (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <Avatar name={patientProfile.nomComplet} size="lg" />
+                <Avatar src={resolvePhotoUrl(patientProfile.profilePhotoUrl)} name={patientProfile.nomComplet} size="lg" />
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">{patientProfile.nomComplet}</h3>
                   <p className="text-sm text-slate-500">{patientProfile.email}</p>

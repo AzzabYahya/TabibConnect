@@ -98,12 +98,12 @@ function DashboardShell({ subtitle, children }) {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <div className="relative h-40 overflow-hidden rounded-b-2xl">
+      <div className="relative h-44 overflow-hidden w-full">
         <MedicalHeroAnimation />
-        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(15,25,35,0.65)] to-[rgba(0,0,0,0)]" />
-        <div className="absolute left-6 top-4 text-white md:top-5">
-          <h1 className="text-2xl font-bold">{title}</h1>
-          <p className="text-sm text-white/90">{subtitle}</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,20,30,0.7)] via-[rgba(10,20,30,0.25)] to-transparent" />
+        <div className="absolute left-6 bottom-5 text-white md:left-8">
+          <h1 className="text-2xl font-bold drop-shadow-lg">{title}</h1>
+          <p className="mt-0.5 text-sm font-medium text-white/85 drop-shadow">{subtitle}</p>
         </div>
       </div>
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">

@@ -303,7 +303,3 @@ function AdminUsersPage() {
 }
 
 export default AdminUsersPage;
-  );
-}
-
-export default AdminUsersPage;
