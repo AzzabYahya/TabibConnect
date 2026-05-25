@@ -43,6 +43,15 @@ cd backend
 npm run prisma:seed
 ```
 
+Si tu veux générer un volume plus important de médecins pour les tests ou la démonstration, tu peux aussi exécuter le script dédié:
+
+```bash
+cd backend
+node scripts/seed-1000-doctors.js
+```
+
+Ce script ajoute environ 1000 médecins supplémentaires avec cabinets, disponibilités et quelques avis de démonstration.
+
 Si tu disposes d’un fichier `dump.sql` issu d’un autre environnement, tu peux l’importer manuellement, mais ce n’est pas le flux standard de TabibConnect.
 
 ## 4. Configurer l’environnement
