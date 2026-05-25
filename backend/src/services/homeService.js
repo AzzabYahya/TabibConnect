@@ -30,6 +30,11 @@ const getHomeSummary = async () => {
     prisma.rendezVous.count(),
     prisma.avis.count(),
     prisma.doctor.findMany({
+      where: {
+        user: {
+          isVerified: true,
+        },
+      },
       include: {
         doctorCabinets: {
           include: {
@@ -95,11 +100,10 @@ const getHomeSummary = async () => {
 
   const specialties = Array.from(specialtyCounts.entries())
     .sort((left, right) => right[1] - left[1])
-    .slice(0, 6)
     .map(([label, count], index) => ({
       label,
       count,
-      color: ['rose', 'indigo', 'amber', 'cyan', 'emerald', 'blue'][index] || 'slate',
+      color: ['rose', 'indigo', 'amber', 'cyan', 'emerald', 'blue'][index % 6] || 'slate',
     }));
 
   const hotspots = Array.from(hotspotGroups.values())

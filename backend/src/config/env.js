@@ -103,6 +103,7 @@ const env = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   stripeCurrency: process.env.STRIPE_CURRENCY || 'mad',
+  redisUrl: process.env.REDIS_URL || '',
 };
 
 

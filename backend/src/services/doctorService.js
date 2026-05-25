@@ -8,6 +8,49 @@ const {
   doctorHasAvailabilityOnDate,
 } = require('./availabilityService');
 
+/** Levenshtein distance for fuzzy search */
+const levenshtein = (a, b) => {
+  const la = a.length;
+  const lb = b.length;
+  if (la === 0) return lb;
+  if (lb === 0) return la;
+  const matrix = [];
+  for (let i = 0; i <= la; i++) matrix[i] = [i];
+  for (let j = 0; j <= lb; j++) matrix[0][j] = j;
+  for (let i = 1; i <= la; i++) {
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[la][lb];
+};
+
+const normalizeText = (value = '') =>
+  String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim();
+
+/** Fuzzy match: checks if `needle` is approximately contained in `haystack` */
+const fuzzyMatch = (haystack, needle) => {
+  const h = normalizeText(haystack);
+  const n = normalizeText(needle);
+  if (!n) return false;
+  if (h.includes(n)) return true;
+  const tolerance = Math.max(2, Math.floor(n.length / 3));
+  if (n.length > h.length) return levenshtein(h, n) <= tolerance;
+  for (let i = 0; i <= h.length - n.length; i++) {
+    if (levenshtein(h.substring(i, i + n.length), n) <= tolerance) return true;
+  }
+  return levenshtein(h, n) <= tolerance;
+};
+
 const toBoolean = (value) => {
   if (typeof value === 'boolean') {
     return value;
@@ -33,6 +76,34 @@ const toStringList = (value) => {
   }
 
   return [];
+};
+
+const expandLanguageFilters = (values = []) => {
+  const expanded = new Set();
+
+  values.forEach((value) => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return;
+    }
+
+    const lower = raw.toLowerCase();
+
+    if (lower.includes('arabe')) {
+      ['Arabe', 'ARABE', 'arabe'].forEach((item) => expanded.add(item));
+    } else if (lower.includes('fran')) {
+      ['Francais', 'FRANCAIS', 'francais', 'Français', 'français'].forEach((item) => expanded.add(item));
+    } else if (lower.includes('amazigh') || lower.includes('tamazight')) {
+      ['Amazigh', 'AMAZIGH', 'amazigh', 'Tamazight', 'tamazight'].forEach((item) => expanded.add(item));
+    } else {
+      expanded.add(raw);
+      expanded.add(lower);
+      expanded.add(raw.toUpperCase());
+      expanded.add(raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase());
+    }
+  });
+
+  return Array.from(expanded).filter(Boolean);
 };
 
 const getDoctorRatingSummary = async (doctorIds = []) => {
@@ -85,9 +156,13 @@ const listDoctors = async (filters) => {
     },
   ];
 
-  if (filters.q) {
-    const parts = filters.q.trim().split(/\s+/).filter(Boolean);
-    parts.forEach((part) => {
+  // Track if q filter is used – we'll do fuzzy post-filtering
+  const qValue = (filters.q || '').trim();
+  const qParts = qValue ? qValue.split(/\s+/).filter(Boolean) : [];
+
+  // Only apply DB-level text filter for exact/ILIKE matching
+  if (qParts.length) {
+    qParts.forEach((part) => {
       andClauses.push({
         OR: [
           { nomComplet: { contains: part, mode: 'insensitive' } },
@@ -123,10 +198,12 @@ const listDoctors = async (filters) => {
     });
   }
 
-  if (filters.langue) {
+  const langues = toStringList(filters.langues || filters.langue);
+  const languageTokens = expandLanguageFilters(langues);
+  if (languageTokens.length) {
     andClauses.push({
       languesParlees: {
-        has: filters.langue,
+        hasSome: languageTokens,
       },
     });
   }
@@ -200,6 +277,54 @@ const listDoctors = async (filters) => {
 
   if (filters.minNote && Number(filters.minNote) > 0) {
     filteredResults = filteredResults.filter(d => d.rating.average >= Number(filters.minNote));
+  }
+
+  // If DB query returned no results and a search term was given,
+  // fall back to fuzzy in-memory search across ALL verified doctors
+  if (filteredResults.length === 0 && qValue) {
+    const fuzzyDoctors = await prisma.doctor.findMany({
+      where: { user: { isVerified: true } },
+      select: {
+        id: true,
+        nomComplet: true,
+        specialite: true,
+        experience: true,
+        tarifConsultation: true,
+        accepteAssurance: true,
+        bio: true,
+        user: { select: { email: true } },
+      },
+    });
+
+    const fuzzyRatingSummary = await getDoctorRatingSummary(fuzzyDoctors.map(d => d.id));
+
+    filteredResults = fuzzyDoctors
+      .filter((doc) => {
+        const matchesQuery = qParts.every((part) =>
+          fuzzyMatch(doc.nomComplet || '', part) ||
+          fuzzyMatch(doc.specialite || '', part) ||
+          fuzzyMatch(doc.user?.email || '', part)
+        );
+        if (!matchesQuery) return false;
+
+        // Re-apply other filters
+        if (filters.specialite && !fuzzyMatch(doc.specialite || '', filters.specialite)) return false;
+        if (toBoolean(filters.accepteAssurance) && !doc.accepteAssurance) return false;
+        if (filters.maxTarif !== undefined && Number(filters.maxTarif) < 2000 && Number(doc.tarifConsultation) > Number(filters.maxTarif)) return false;
+
+        return true;
+      })
+      .map(doc => {
+        const rating = fuzzyRatingSummary.get(doc.id) || { average: 0, count: 0 };
+        return { ...doc, rating, inferredSexe: inferGender(doc) };
+      });
+
+    if (filters.sexe && filters.sexe !== 'TOUT') {
+      filteredResults = filteredResults.filter(d => d.inferredSexe === filters.sexe);
+    }
+    if (filters.minNote && Number(filters.minNote) > 0) {
+      filteredResults = filteredResults.filter(d => d.rating.average >= Number(filters.minNote));
+    }
   }
 
   const total = filteredResults.length;

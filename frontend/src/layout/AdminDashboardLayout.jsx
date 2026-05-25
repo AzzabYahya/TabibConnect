@@ -10,6 +10,7 @@ import {
   BadgeCheck,
   BarChart3,
   FileText,
+  UserCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +31,7 @@ function AdminDashboardLayout() {
     { to: '/dashboard/admin/logs', label: t('dashboard.adminMenu.logs'), icon: Activity },
     { to: '/dashboard/admin/notifications', label: t('dashboard.adminMenu.notifications'), icon: Bell },
     { to: '/dashboard/admin/appointments', label: 'Rendez-vous', icon: FileText },
+    { to: '/dashboard/admin/account', label: 'Mon compte', icon: UserCircle },
   ];
 
 

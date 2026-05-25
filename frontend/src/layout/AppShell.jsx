@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
-  Settings,
   Stethoscope,
   UserRoundPlus,
 } from 'lucide-react';
@@ -103,21 +102,15 @@ function AppShell() {
                   </Link>
                 ) : null}
                 {!isDashboardRoute ? (
-                  <>
-                    <Link to="/settings" className={`${headerActionClassName} border border-slate-300 bg-white/80 text-slate-700 hover:border-slate-400 hover:bg-slate-100`}>
-                      <Settings size={16} />
-                      {t('common.settings')}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      disabled={isLoggingOut}
-                      className={`${headerActionClassName} border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 disabled:cursor-wait disabled:opacity-70`}
-                    >
-                      <LogOut size={16} />
-                      {isLoggingOut ? t('common.logoutLoading') : t('common.logout')}
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className={`${headerActionClassName} border border-slate-300 bg-white/80 text-slate-700 hover:border-slate-400 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70`}
+                  >
+                    <LogOut size={16} />
+                    {isLoggingOut ? t('common.logoutLoading') : t('common.logout')}
+                  </button>
                 ) : null}
               </>
             )}

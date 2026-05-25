@@ -20,6 +20,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
+import AccountSettingsPanel from '../components/account/AccountSettingsPanel';
 import api from '../lib/api';
 
 const resolveImageUrl = (value, profile) => {
@@ -367,6 +368,8 @@ function PatientProfilePage() {
           </Card>
         </div>
       </div>
+
+      <AccountSettingsPanel className="mt-8" />
     </div>
   );
 }

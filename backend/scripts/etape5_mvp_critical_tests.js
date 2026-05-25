@@ -66,17 +66,30 @@ const extractCookie = (setCookieHeader) => {
   return setCookieHeader.split(';')[0];
 };
 
-const login = async (email, password) => {
-  const csrfResponse = await request('/api/auth/csrf-token');
+const requestWithCsrf = async (path, options = {}) => {
+  const csrfHeaders = {};
+  if (options.token) {
+    csrfHeaders.Authorization = `Bearer ${options.token}`;
+  }
+  const csrfResponse = await request('/api/v1/auth/csrf-token', { headers: csrfHeaders });
   const csrfToken = csrfResponse.body?.csrfToken;
   const csrfCookie = extractCookie(csrfResponse.headers.get('set-cookie'));
 
-  const loginResponse = await request('/api/auth/login', {
-    method: 'POST',
+  const finalHeaders = {
+    ...options.headers,
+    [env.csrfHeaderName]: csrfToken,
+  };
+
+  return request(path, {
+    ...options,
     cookie: csrfCookie,
-    headers: {
-      [env.csrfHeaderName]: csrfToken,
-    },
+    headers: finalHeaders,
+  });
+};
+
+const login = async (email, password) => {
+  const loginResponse = await requestWithCsrf('/api/v1/auth/login', {
+    method: 'POST',
     body: {
       email,
       password,
@@ -98,7 +111,7 @@ const findFutureSlot = async (doctorId, maxDays = 35) => {
     const dateISO = date.toISOString().slice(0, 10);
 
     const availResponse = await request(
-      `/api/doctors/${doctorId}/availabilities?date=${dateISO}`
+      `/api/v1/doctors/${doctorId}/availabilities?date=${dateISO}`
     );
 
     const availabilities = availResponse.body?.data?.availabilities || [];
@@ -171,15 +184,18 @@ const run = async () => {
       typeConsultation: 'PRESENTIEL',
       notes: 'Critical test #1',
       dateHeure: sharedSlot.dateHeure,
+      methodePaiement: 'CASH',
+      acceptedGeneralTerms: true,
+      acceptedCashPolicy: true,
     };
 
     const [attemptA, attemptB] = await Promise.all([
-      request('/api/appointments', {
+      requestWithCsrf('/api/v1/appointments', {
         method: 'POST',
         token: patient1Auth.accessToken,
         body: createPayload,
       }),
-      request('/api/appointments', {
+      requestWithCsrf('/api/v1/appointments', {
         method: 'POST',
         token: patient2Auth.accessToken,
         body: createPayload,
@@ -260,7 +276,7 @@ const run = async () => {
 
     const unverifiedSlot = await findFutureSlot(unverifiedDoctor.id, 3);
 
-    const unverifiedBooking = await request('/api/appointments', {
+    const unverifiedBooking = await requestWithCsrf('/api/v1/appointments', {
       method: 'POST',
       token: patient1Auth.accessToken,
       body: {
@@ -271,6 +287,9 @@ const run = async () => {
         typeConsultation: 'PRESENTIEL',
         notes: 'Critical test #2',
         dateHeure: unverifiedSlot.dateHeure,
+        methodePaiement: 'CASH',
+        acceptedGeneralTerms: true,
+        acceptedCashPolicy: true,
       },
     });
 
@@ -305,7 +324,7 @@ const run = async () => {
 
     cleanup.appointmentIds.push(lateAppointment.id);
 
-    const lateCancellation = await request(`/api/appointments/${lateAppointment.id}/cancel`, {
+    const lateCancellation = await requestWithCsrf(`/api/v1/appointments/${lateAppointment.id}/cancel`, {
       method: 'PUT',
       token: patient1Auth.accessToken,
       body: {

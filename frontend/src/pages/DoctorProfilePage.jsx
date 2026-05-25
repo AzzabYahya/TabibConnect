@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { CircleMarker, Popup, TileLayer } from 'react-leaflet';
+import SafeMapContainer from '../components/common/SafeMapContainer';
 import {
   CalendarClock,
   CalendarPlus,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Languages,
   MapPin,
@@ -12,7 +15,7 @@ import {
   NotebookTabs,
   Star,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -122,6 +125,7 @@ function DoctorProfilePage() {
   const [bookingForm, setBookingForm] = useState(defaultBookingForm);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const session = getCurrentSession();
+  const [calendarMonthDate, setCalendarMonthDate] = useState(() => parseLocalISODate(selectedDate));
 
   const doctorQuery = useQuery({
     queryKey: ['doctor-profile', id],
@@ -199,7 +203,10 @@ function DoctorProfilePage() {
     () => new Set((doctor.availabilityDays || []).filter(Boolean)),
     [doctor.availabilityDays]
   );
-  const calendarMonthDate = useMemo(() => parseLocalISODate(selectedDate), [selectedDate]);
+  const todayISO = useMemo(() => toLocalISODate(new Date()), []);
+  useEffect(() => {
+    setCalendarMonthDate(parseLocalISODate(selectedDate));
+  }, [selectedDate]);
   const calendarMonthLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('fr-MA', {
@@ -210,7 +217,6 @@ function DoctorProfilePage() {
   );
   const calendarDays = useMemo(() => {
     const gridStart = getCalendarGridStart(calendarMonthDate);
-    const todayISO = toLocalISODate(new Date());
 
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(gridStart);
@@ -220,6 +226,7 @@ function DoctorProfilePage() {
       const weekdayIndex = date.getDay();
       const isCurrentMonth = date.getMonth() === calendarMonthDate.getMonth();
       const isAvailable = activeAvailabilityDays.has(weekdayEnumByIndex[weekdayIndex]);
+      const isPast = isoDate < todayISO;
 
       return {
         date,
@@ -230,9 +237,19 @@ function DoctorProfilePage() {
         isAvailable,
         isSelected: isoDate === selectedDate,
         isToday: isoDate === todayISO,
+        isPast,
       };
     });
-  }, [activeAvailabilityDays, calendarMonthDate, selectedDate]);
+  }, [activeAvailabilityDays, calendarMonthDate, selectedDate, todayISO]);
+
+  const shiftCalendarMonth = (delta) => {
+    setCalendarMonthDate((current) => {
+      const next = new Date(current);
+      next.setDate(1);
+      next.setMonth(next.getMonth() + delta);
+      return next;
+    });
+  };
 
   if (doctorQuery.isLoading) {
     return (
@@ -400,7 +417,25 @@ function DoctorProfilePage() {
 
             <Card className="space-y-3 border-med-primary/20 bg-slate-50/80" id="doctor-availabilities-section">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold capitalize text-slate-900">{calendarMonthLabel}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => shiftCalendarMonth(-1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-med-primary/40 hover:text-med-primary"
+                    aria-label="Mois précédent"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <p className="text-sm font-semibold capitalize text-slate-900">{calendarMonthLabel}</p>
+                  <button
+                    type="button"
+                    onClick={() => shiftCalendarMonth(1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-med-primary/40 hover:text-med-primary"
+                    aria-label="Mois suivant"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
                 <p className="text-xs text-slate-500">{activeAvailabilityDays.size} jours actifs</p>
               </div>
               <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">
@@ -413,14 +448,16 @@ function DoctorProfilePage() {
                   <button
                     key={`compact-${day.isoDate}`}
                     type="button"
-                    disabled={!day.isAvailable}
+                    disabled={!day.isAvailable || day.isPast}
                     onClick={() => {
-                      if (!day.isAvailable) return;
+                      if (!day.isAvailable || day.isPast) return;
                       setSelectedDate(day.isoDate);
                       setSelectedSlot(null);
                     }}
                     className={`rounded-xl border p-1 text-xs font-semibold transition ${
-                      day.isSelected
+                      day.isPast
+                        ? 'border-slate-200 bg-slate-100 text-slate-300'
+                        : day.isSelected
                         ? 'border-med-primary bg-med-primary text-white'
                         : day.isAvailable
                           ? 'border-med-secondary/30 bg-white text-slate-800 hover:border-med-secondary/50'
@@ -440,6 +477,7 @@ function DoctorProfilePage() {
                   id="selected-date"
                   type="date"
                   value={selectedDate}
+                  min={todayISO}
                   onChange={(event) => {
                     setSelectedDate(event.target.value);
                     setSelectedSlot(null);
@@ -637,7 +675,7 @@ function DoctorProfilePage() {
             {canShowMap ? (
               <>
                 <div className="h-[320px] overflow-hidden rounded-xl border border-slate-200">
-                  <MapContainer center={center} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+                  <SafeMapContainer mapKey={`doctor-profile-${id}`} center={center} zoom={13} scrollWheelZoom={false} className="h-full w-full">
                     <TileLayer
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -656,7 +694,7 @@ function DoctorProfilePage() {
                         </Popup>
                       </CircleMarker>
                     ))}
-                  </MapContainer>
+                  </SafeMapContainer>
                 </div>
 
                 <div className="grid gap-2">

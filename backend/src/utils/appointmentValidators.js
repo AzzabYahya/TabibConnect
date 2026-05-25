@@ -65,6 +65,15 @@ const createDoctorPatientNoteValidator = [
   body('isVisibleToPeers').optional().isBoolean().toBoolean(),
 ];
 
+const createOrdonnanceValidator = [
+  param('id').isString().isLength({ min: 10, max: 40 }),
+  body('medicaments').isArray({ min: 1 }),
+  body('medicaments.*.medicament').trim().isLength({ min: 2, max: 200 }),
+  body('medicaments.*.posologie').trim().isLength({ min: 2, max: 300 }),
+  body('instructions').optional().trim().isLength({ max: 2000 }).escape(),
+  body('renouvelable').optional().isBoolean().toBoolean(),
+];
+
 module.exports = {
   appointmentIdValidator,
   cancelAppointmentValidator,
@@ -72,4 +81,5 @@ module.exports = {
   createReviewValidator,
   createDoctorPatientNoteValidator,
   rescheduleAppointmentValidator,
+  createOrdonnanceValidator,
 };

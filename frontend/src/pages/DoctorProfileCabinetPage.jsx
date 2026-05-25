@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { MapContainer, TileLayer, CircleMarker, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { TileLayer, CircleMarker, Marker, useMapEvents, useMap } from 'react-leaflet';
+import SafeMapContainer from '../components/common/SafeMapContainer';
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import L from 'leaflet';
@@ -312,7 +313,7 @@ function DoctorProfileCabinetPage() {
         </form>
 
         <div className="relative h-64 overflow-hidden rounded-2xl border group">
-          <MapContainer center={mapCenter} zoom={5} scrollWheelZoom={true} className="h-full w-full">
+          <SafeMapContainer mapKey="doctor-cabinet-profile-map" center={mapCenter} zoom={5} scrollWheelZoom className="h-full w-full">
             <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <ChangeView center={mapCenter} />
             <LocationMarker position={selectedPos} setPosition={handleMapClick} />
@@ -326,7 +327,7 @@ function DoctorProfileCabinetPage() {
                   pathOptions={{ color: '#1A6B8A', fillColor: '#2ECC8F', fillOpacity: 0.85 }}
                 />
               ))}
-          </MapContainer>
+          </SafeMapContainer>
           <div className="absolute bottom-3 left-3 z-[1000] rounded-lg bg-white/90 px-3 py-1.5 text-[10px] font-medium text-slate-600 shadow-sm backdrop-blur-sm border border-slate-200 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
             Cliquez sur la carte pour définir la position
           </div>

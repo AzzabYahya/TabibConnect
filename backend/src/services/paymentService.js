@@ -53,11 +53,23 @@ const confirmCardPaymentSession = async ({ sessionId, appointmentId, userId }) =
         userId: payment.rendezVous.patient.userId,
         type: 'PAIEMENT_RECU',
         message: `Paiement carte confirmé. Référence: ${updated.reference}.`,
+        metadata: {
+          appointmentId: payment.rendezVous.id,
+          category: 'PAIEMENT',
+          event: 'PAID',
+          reference: updated.reference,
+        },
       }),
       createNotification({
         userId: payment.rendezVous.doctor.userId,
         type: 'PAIEMENT_RECU',
         message: `Paiement carte reçu pour le rendez-vous ${payment.rendezVous.id}.`,
+        metadata: {
+          appointmentId: payment.rendezVous.id,
+          category: 'PAIEMENT',
+          event: 'PAID',
+          reference: updated.reference,
+        },
       }),
     ]);
   }

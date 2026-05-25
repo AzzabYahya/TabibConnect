@@ -2,14 +2,16 @@ import { Bell, LogOut } from 'lucide-react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
+import NotificationCategoryFilter from '../components/notifications/NotificationCategoryFilter';
+import NotificationDetailModal from '../components/notifications/NotificationDetailModal';
+import NotificationItem from '../components/notifications/NotificationItem';
 import { getCurrentSession } from '../lib/auth';
 import { logoutCurrentUser } from '../lib/accountActions';
 import api from '../lib/api';
@@ -25,6 +27,10 @@ function DashboardShell({ subtitle, children }) {
   const role = user.role || 'PATIENT';
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifPage, setNotifPage] = useState(1);
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const queryClient = useQueryClient();
+
   const profileQuery = useQuery({
     queryKey: ['dashboard-shell-profile', role],
     staleTime: 30 * 1000,
@@ -47,6 +53,7 @@ function DashboardShell({ subtitle, children }) {
     const normalized = noEmail.replace(/^(dr\.?|docteur)\s+/i, '').trim();
     return normalized || 'Utilisateur';
   }, [profileQuery.data?.name, user]);
+
   useNotificationSocket();
   const firstName = useMemo(() => resolvedName.split(/[.\s_-]+/)[0] || 'Utilisateur', [resolvedName]);
 
@@ -64,9 +71,11 @@ function DashboardShell({ subtitle, children }) {
 
   const notificationsQuery = useQuery({
     enabled: isNotifOpen,
-    queryKey: ['notifications-list', isNotifOpen, notifPage],
+    queryKey: ['notifications-list', isNotifOpen, notifPage, categoryFilter],
     queryFn: async () => {
-      const response = await api.get('/notifications', { params: { page: notifPage, limit: 20 } });
+      const params = { page: notifPage, limit: 20 };
+      if (categoryFilter !== 'ALL') params.category = categoryFilter;
+      const response = await api.get('/notifications', { params });
       return response.data?.data;
     },
   });
@@ -84,6 +93,27 @@ function DashboardShell({ subtitle, children }) {
     await api.post('/notifications/mark-read');
     await unreadQuery.refetch();
     await notificationsQuery.refetch();
+    queryClient.invalidateQueries({ queryKey: ['patient-notifications'] });
+  };
+
+  const markReadOne = async (id) => {
+    await api.post('/notifications/mark-read', { ids: [id] });
+    await unreadQuery.refetch();
+    await notificationsQuery.refetch();
+    queryClient.invalidateQueries({ queryKey: ['patient-notifications'] });
+    setSelectedNotification((current) => (current?.id === id ? { ...current, isRead: true } : current));
+  };
+
+  const openNotification = async (notification) => {
+    setSelectedNotification(notification);
+    if (!notification.isRead) {
+      await markReadOne(notification.id);
+    }
+  };
+
+  const onCategoryChange = (value) => {
+    setCategoryFilter(value);
+    setNotifPage(1);
   };
 
   const onLogout = async () => {
@@ -138,6 +168,7 @@ function DashboardShell({ subtitle, children }) {
 
       <Modal isOpen={isNotifOpen} title={t('common.notifications')} onClose={() => setIsNotifOpen(false)}>
         <div className="space-y-4">
+          <NotificationCategoryFilter value={categoryFilter} onChange={onCategoryChange} />
           {notificationsQuery.isError ? (
             <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
               <div className="rounded-full bg-red-50 p-3 text-red-500">
@@ -167,27 +198,7 @@ function DashboardShell({ subtitle, children }) {
           ) : (
             <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-1">
               {(notificationsQuery.data?.items || []).map((n) => (
-                <div key={n.id} className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 transition-colors hover:bg-slate-100">
-                  <div className="mt-1">
-                    <div className={`rounded-full p-1.5 ${!n.isRead ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'}`}>
-                      <Bell className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <p className={`text-sm font-semibold ${!n.isRead ? 'text-slate-900' : 'text-slate-500'}`}>
-                          {n.title}
-                        </p>
-                        {!n.isRead ? <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> : null}
-                      </div>
-                      <p className="text-[10px] font-medium text-slate-400">{n.time}</p>
-                    </div>
-                    <p className={`mt-0.5 text-sm ${!n.isRead ? 'text-slate-700' : 'text-slate-500'}`}>
-                      {n.body}
-                    </p>
-                  </div>
-                </div>
+                <NotificationItem key={n.id} notification={n} onClick={openNotification} />
               ))}
             </div>
           )}
@@ -216,11 +227,18 @@ function DashboardShell({ subtitle, children }) {
             </div>
           </div>
 
-          <Button onClick={() => markReadAll().catch(() => { })} className="w-full">
+          <Button onClick={() => markReadAll().catch(() => {})} className="w-full">
             {t('notifications.markAllRead', 'Tout marquer comme lu')}
           </Button>
         </div>
       </Modal>
+
+      <NotificationDetailModal
+        notification={selectedNotification}
+        isOpen={Boolean(selectedNotification)}
+        onClose={() => setSelectedNotification(null)}
+        onMarkRead={markReadOne}
+      />
     </div>
   );
 }

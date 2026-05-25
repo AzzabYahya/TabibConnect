@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { CalendarDays, Clock, Users, Building2, BarChart3, Star, X } from 'lucide-react';
+import { CalendarDays, Clock, Users, Building2, BarChart3, Star, UserCircle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import DashboardShell from './DashboardShell';
@@ -16,6 +16,7 @@ function DoctorDashboardLayout() {
     { to: '/dashboard/doctor/profile', label: t('dashboard.doctorTabs.profile'), icon: Building2 },
     { to: '/dashboard/doctor/stats', label: t('dashboard.doctorTabs.stats'), icon: BarChart3 },
     { to: '/dashboard/doctor/reviews', label: t('dashboard.doctorTabs.reviews'), icon: Star },
+    { to: '/dashboard/doctor/account', label: 'Mon compte', icon: UserCircle },
   ];
 
   return (

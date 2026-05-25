@@ -67,6 +67,7 @@ model Patient {
   changeRequests                PatientChangeRequest[]
   patientDocuments              PatientDocument[]
   rendezVous                    RendezVous[]
+  ordonnances                   Ordonnance[]
 
   @@index([ville])
   @@index([sexe])
@@ -126,6 +127,7 @@ model Doctor {
   patientNotes                  DoctorPatientNote[]
   paiements                     Paiement[]
   rendezVous                    RendezVous[]
+  ordonnances                   Ordonnance[]
 
   @@index([nomComplet])
   @@index([specialite])
@@ -265,6 +267,7 @@ model RendezVous {
   avis                 Avis?
   doctorPatientNotes   DoctorPatientNote[]
   paiement             Paiement?
+  ordonnance           Ordonnance?
   cabinet              Cabinet?            @relation(fields: [cabinetId], references: [id])
   disponibilite        Disponibilite?      @relation(fields: [disponibiliteId], references: [id])
   doctor               Doctor              @relation(fields: [doctorId], references: [id])
@@ -322,6 +325,7 @@ model Notification {
   id        String           @id @default(cuid())
   type      NotificationType
   message   String
+  metadata  Json?
   isRead    Boolean          @default(false)
   userId    String
   createdAt DateTime         @default(now())
@@ -347,6 +351,28 @@ model Paiement {
   @@index([doctorId, createdAt])
   @@index([statut, createdAt])
   @@index([methode, createdAt])
+}
+
+model Ordonnance {
+  id              String     @id @default(cuid())
+  rendezVousId    String     @unique
+  doctorId        String
+  patientId       String
+  medicaments     Json
+  instructions    String?
+  renouvelable    Boolean    @default(false)
+  qrCode          String     @unique
+  pdfPath         String?
+  uploadedFile    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  rendezVous      RendezVous @relation(fields: [rendezVousId], references: [id], onDelete: Cascade)
+  doctor          Doctor     @relation(fields: [doctorId], references: [id])
+  patient         Patient    @relation(fields: [patientId], references: [id])
+
+  @@index([doctorId, createdAt])
+  @@index([patientId, createdAt])
+  @@index([qrCode])
 }
 
 enum UserRole {

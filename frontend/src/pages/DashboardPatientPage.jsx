@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
+import NotificationCategoryFilter from '../components/notifications/NotificationCategoryFilter';
+import NotificationDetailModal from '../components/notifications/NotificationDetailModal';
+import NotificationItem from '../components/notifications/NotificationItem';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -22,20 +25,14 @@ const statusColor = {
   NO_SHOW: 'warning',
 };
 
-const notificationTone = {
-  RDV_CONFIRME: 'success',
-  RAPPEL_RDV: 'info',
-  PAIEMENT_RECU: 'warning',
-  RDV_ANNULE: 'warning',
-  SYSTEME: 'neutral',
-};
-
 function DashboardPatientPage() {
   const navigate = useNavigate();
   useNotificationSocket();
   const [historyPage, setHistoryPage] = useState(1);
   const [historyStatus, setHistoryStatus] = useState('ALL');
   const [notificationsPage, setNotificationsPage] = useState(1);
+  const [notificationCategory, setNotificationCategory] = useState('ALL');
+  const [selectedNotification, setSelectedNotification] = useState(null);
   const [isProfileRequestOpen, setIsProfileRequestOpen] = useState(false);
   const [profileReason, setProfileReason] = useState('');
   const [profileForm, setProfileForm] = useState({ adresse: '', ville: '', groupeSanguin: '', antecedents: '' });
@@ -65,15 +62,17 @@ function DashboardPatientPage() {
   });
 
   const notificationsQuery = useQuery({
-    queryKey: ['patient-notifications', notificationsPage],
+    queryKey: ['patient-notifications', notificationsPage, notificationCategory],
     queryFn: async () => {
-      const response = await api.get('/dashboard/patient/notifications', { params: { page: notificationsPage, limit: 20 } });
+      const params = { page: notificationsPage, limit: 20 };
+      if (notificationCategory !== 'ALL') params.category = notificationCategory;
+      const response = await api.get('/notifications', { params });
       return response.data?.data;
     },
   });
 
   const markAllRead = useMutation({
-    mutationFn: async () => api.post('/dashboard/patient/notifications/mark-read'),
+    mutationFn: async () => api.post('/notifications/mark-read'),
     onSuccess: async () => {
       toast.success('Tout marqué comme lu.');
       await notificationsQuery.refetch();
@@ -81,6 +80,20 @@ function DashboardPatientPage() {
     },
     onError: (error) => toast.error(error?.response?.data?.message || 'Action impossible.'),
   });
+
+  const markReadOne = async (id) => {
+    await api.post('/notifications/mark-read', { ids: [id] });
+    await notificationsQuery.refetch();
+    await dashboardQuery.refetch();
+    setSelectedNotification((current) => (current?.id === id ? { ...current, isRead: true } : current));
+  };
+
+  const openNotification = async (notification) => {
+    setSelectedNotification(notification);
+    if (!notification.isRead) {
+      await markReadOne(notification.id);
+    }
+  };
 
   const submitProfileRequest = useMutation({
     mutationFn: async () =>
@@ -129,7 +142,8 @@ function DashboardPatientPage() {
   const warnings = medical.warnings || 0;
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {warnings > 0 && (
         <Card className={`border-none shadow-sm ${warnings >= 2 ? 'bg-red-50 text-red-900' : 'bg-amber-50 text-amber-900'}`}>
           <div className="flex items-center gap-3 p-1">
@@ -305,6 +319,13 @@ function DashboardPatientPage() {
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
             {unreadBadge ? <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> : null}
           </div>
+          <NotificationCategoryFilter
+            value={notificationCategory}
+            onChange={(value) => {
+              setNotificationCategory(value);
+              setNotificationsPage(1);
+            }}
+          />
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>Tout marquer comme lu</Button>
           </div>
@@ -314,15 +335,7 @@ function DashboardPatientPage() {
           ) : (
             <div className="max-h-[350px] space-y-2 overflow-y-auto pr-1">
               {notifications.map((n) => (
-                <div key={n.id} className="rounded-2xl bg-slate-50 px-3 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={notificationTone[n.type] || 'neutral'}>{n.type}</Badge>
-                    {!n.isRead ? <span className="h-2 w-2 rounded-full bg-red-500" /> : null}
-                    <p className="text-xs text-slate-500">{n.time}</p>
-                  </div>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{n.title}</p>
-                  <p className="text-sm text-slate-700">{n.body}</p>
-                </div>
+                <NotificationItem key={n.id} notification={n} onClick={openNotification} />
               ))}
               {!notifications.length ? <p className="text-sm text-slate-600">Aucune notification.</p> : null}
             </div>
@@ -336,6 +349,7 @@ function DashboardPatientPage() {
         </Card>
       </div>
     </div>
+      </div>
 
     <Modal isOpen={isProfileRequestOpen} title="Demande de modification profil (validation admin)" onClose={() => setIsProfileRequestOpen(false)}>
         <div className="space-y-3">
@@ -354,7 +368,14 @@ function DashboardPatientPage() {
           </div>
         </div>
       </Modal>
-    </div>
+
+      <NotificationDetailModal
+        notification={selectedNotification}
+        isOpen={Boolean(selectedNotification)}
+        onClose={() => setSelectedNotification(null)}
+        onMarkRead={markReadOne}
+      />
+    </>
   );
 }
 

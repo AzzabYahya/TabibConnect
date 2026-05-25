@@ -2,16 +2,22 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 
+import NotificationCategoryFilter from '../components/notifications/NotificationCategoryFilter';
+import NotificationDetailModal from '../components/notifications/NotificationDetailModal';
+import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Skeleton from '../components/ui/Skeleton';
 import api from '../lib/api';
+import { categoryBadgeVariant } from '../lib/notifications';
 
 function AdminNotificationsPage() {
   const [page, setPage] = useState(1);
   const [isRead, setIsRead] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState(null);
 
   const query = useQuery({
     queryKey: ['admin-notifications', page, isRead, search],
@@ -31,16 +37,26 @@ function AdminNotificationsPage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Action impossible.'),
   });
 
-  const items = query.data?.items || [];
+  const allItems = query.data?.items || [];
+  const items = useMemo(() => {
+    if (categoryFilter === 'ALL') return allItems;
+    return allItems.filter((item) => item.category === categoryFilter);
+  }, [allItems, categoryFilter]);
+
   const pagination = query.data?.pagination;
 
-  const toggle = (id) => {
+  const toggle = (id, event) => {
+    event.stopPropagation();
     setSelectedIds((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
   };
 
   const allIdsOnPage = useMemo(() => items.map((n) => n.id), [items]);
   const selectAllOnPage = () => setSelectedIds(allIdsOnPage);
   const clearSelection = () => setSelectedIds([]);
+
+  const openNotification = (notification) => {
+    setSelectedNotification(notification);
+  };
 
   return (
     <div className="space-y-4">
@@ -60,24 +76,37 @@ function AdminNotificationsPage() {
         </div>
       </Card>
 
+      <NotificationCategoryFilter value={categoryFilter} onChange={setCategoryFilter} />
+
       <Card className="space-y-3">
         {query.isLoading ? (
           <div className="space-y-2">{Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
         ) : (
           <div className="space-y-2">
             {items.map((n) => (
-              <label key={n.id} className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 px-3 py-2">
-                <input type="checkbox" checked={selectedIds.includes(n.id)} onChange={() => toggle(n.id)} className="mt-1" />
-                <div className="min-w-0">
+              <div
+                key={n.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openNotification(n)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') openNotification(n);
+                }}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 transition hover:bg-slate-100"
+              >
+                <input type="checkbox" checked={selectedIds.includes(n.id)} onChange={(event) => toggle(n.id, event)} onClick={(event) => event.stopPropagation()} className="mt-1" />
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{n.type}</p>
+                    <Badge variant={categoryBadgeVariant[n.category] || 'neutral'}>{n.label}</Badge>
+                    <Badge variant="neutral">{n.type}</Badge>
                     {!n.isRead ? <span className="h-2 w-2 rounded-full bg-red-500" /> : null}
                     <p className="text-xs text-slate-500">{new Date(n.createdAt).toLocaleString('fr-MA')}</p>
                     <p className="text-xs text-slate-500">• {n.user?.email} ({n.user?.role})</p>
                   </div>
-                  <p className="text-sm text-slate-700">{n.message}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{n.title}</p>
+                  <p className="text-sm text-slate-700">{n.body}</p>
                 </div>
-              </label>
+              </div>
             ))}
             {!items.length ? <p className="text-sm text-slate-600">Aucune notification.</p> : null}
           </div>
@@ -89,6 +118,16 @@ function AdminNotificationsPage() {
         <span className="text-sm">{pagination?.page || 1} / {pagination?.totalPages || 1}</span>
         <Button variant="outline" size="sm" disabled={!pagination?.hasNextPage} onClick={() => setPage((p) => p + 1)}>→</Button>
       </div>
+
+      <NotificationDetailModal
+        notification={selectedNotification}
+        isOpen={Boolean(selectedNotification)}
+        onClose={() => setSelectedNotification(null)}
+        onMarkRead={async (id) => {
+          await markReadMutation.mutateAsync([id]);
+          setSelectedNotification((current) => (current?.id === id ? { ...current, isRead: true } : current));
+        }}
+      />
     </div>
   );
 }

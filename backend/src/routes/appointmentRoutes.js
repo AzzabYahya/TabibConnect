@@ -1,6 +1,8 @@
 const express = require('express');
 
 const appointmentController = require('../controllers/appointmentController');
+const ordonnanceController = require('../controllers/ordonnanceController');
+const uploadOrdonnance = require('../middlewares/uploadOrdonnance');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const asyncHandler = require('../utils/asyncHandler');
@@ -11,6 +13,7 @@ const {
   cancelAppointmentValidator,
   createAppointmentValidator,
   createDoctorPatientNoteValidator,
+  createOrdonnanceValidator,
   createReviewValidator,
   rescheduleAppointmentValidator,
 } = require('../utils/appointmentValidators');
@@ -54,6 +57,38 @@ router.get(
   '/upcoming',
   authorize(['PATIENT', 'DOCTOR']),
   asyncHandler(appointmentController.getUpcomingAppointments)
+);
+
+router.get(
+  '/:id/ordonnance',
+  appointmentIdValidator,
+  validateRequest,
+  asyncHandler(ordonnanceController.getOrdonnance)
+);
+
+router.post(
+  '/:id/ordonnance',
+  authorize(['DOCTOR']),
+  createOrdonnanceValidator,
+  validateRequest,
+  asyncHandler(ordonnanceController.createOrdonnance)
+);
+
+router.post(
+  '/:id/ordonnance/upload',
+  authorize(['DOCTOR']),
+  appointmentIdValidator,
+  validateRequest,
+  uploadOrdonnance.single('file'),
+  asyncHandler(ordonnanceController.uploadOrdonnance)
+);
+
+router.post(
+  '/:id/ordonnance/resend',
+  authorize(['DOCTOR', 'PATIENT']),
+  appointmentIdValidator,
+  validateRequest,
+  asyncHandler(ordonnanceController.resendOrdonnance)
 );
 
 router.get(

@@ -19,7 +19,7 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -29,7 +29,6 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import MotionCard from '../components/ui/MotionCard';
 import Skeleton from '../components/ui/Skeleton';
-import Input from '../components/ui/Input';
 import api from '../lib/api';
 import {
   formatFrenchLabel,
@@ -80,6 +79,57 @@ const specialtyVisualPalette = [
   { Icon: Ear, backgroundColor: '#E0F2FE', color: '#0284C7', borderColor: '#7DD3FC' },
   { Icon: Stethoscope, backgroundColor: '#F1F5F9', color: '#334155', borderColor: '#CBD5E1' },
 ];
+
+const suggestionGroupMeta = {
+  specialites: { label: 'Spécialités', Icon: Stethoscope },
+  medecins: { label: 'Médecins', Icon: UserRound },
+  symptomes: { label: 'Symptômes', Icon: Sparkles },
+};
+
+const availabilityFormatter = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const formatAvailabilityLabel = (dateIso) => {
+  if (!dateIso) {
+    return { text: 'Prochain: non renseigné', isSoon: false };
+  }
+
+  const date = new Date(dateIso);
+  if (Number.isNaN(date.getTime())) {
+    return { text: 'Prochain: non renseigné', isSoon: false };
+  }
+
+  const diffDays = (date.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+  const label = availabilityFormatter.format(date);
+
+  if (diffDays <= 7) {
+    return { text: `Prochain dispo : ${label}`, isSoon: true };
+  }
+
+  return { text: `Prochain: ${label}`, isSoon: false };
+};
+
+const resolveSuggestionImageUrl = (value) => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  const base = api.defaults.baseURL.endsWith('/') ? api.defaults.baseURL : `${api.defaults.baseURL}/`;
+  const path = value.startsWith('/') ? value.slice(1) : value;
+
+  try {
+    return new URL(path, base).toString();
+  } catch {
+    return undefined;
+  }
+};
 
 function getStatIcon(label) {
   return statIconMap[label] || UsersRound;
@@ -329,7 +379,7 @@ function HomePage() {
 
   const homeQuery = useQuery({
     queryKey: ['home-summary'],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     retry: 1,
     queryFn: async () => {
       const response = await api.get('/home/summary');
@@ -346,6 +396,7 @@ function HomePage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(homeSearchSchema),
@@ -355,11 +406,215 @@ function HomePage() {
     },
   });
 
+  const queryValue = watch('query') || '';
+  const villeValue = watch('ville') || '';
+  const trimmedQuery = String(queryValue).trim();
+
+  const [suggestions, setSuggestions] = useState({
+    specialites: [],
+    medecins: [],
+    symptomes: [],
+  });
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const searchContainerRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const allowSuggestionsRef = useRef(true);
+
+  const suggestionRows = useMemo(() => {
+    let index = 0;
+    const mapRows = (type, items) =>
+      (items || []).map((item) => {
+        const row = {
+          index,
+          id: `home-suggestion-${index}`,
+          type,
+          data: item,
+        };
+        index += 1;
+        return row;
+      });
+
+    const specialites = mapRows('specialite', suggestions.specialites);
+    const medecins = mapRows('medecin', suggestions.medecins);
+    const symptomes = mapRows('symptome', suggestions.symptomes);
+    const all = {
+      index,
+      id: `home-suggestion-${index}`,
+      type: 'all',
+      data: { query: trimmedQuery, ville: villeValue },
+    };
+
+    return {
+      specialites,
+      medecins,
+      symptomes,
+      all,
+      total: index + 1,
+    };
+  }, [suggestions, trimmedQuery, villeValue]);
+
+  const flatSuggestionRows = useMemo(
+    () => [
+      ...suggestionRows.specialites,
+      ...suggestionRows.medecins,
+      ...suggestionRows.symptomes,
+      suggestionRows.all,
+    ],
+    [suggestionRows]
+  );
+
+  useEffect(() => {
+    if (trimmedQuery.length < 2) {
+      setSuggestions({ specialites: [], medecins: [], symptomes: [] });
+      setSuggestionsLoading(false);
+      setSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+      return undefined;
+    }
+
+    setSuggestionsLoading(true);
+    const timeoutId = window.setTimeout(async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        const response = await api.get('/search/suggestions', {
+          params: {
+            q: trimmedQuery,
+            ville: villeValue || undefined,
+          },
+          signal: controller.signal,
+        });
+
+        const payload = response.data?.data || response.data || {};
+        setSuggestions({
+          specialites: Array.isArray(payload.specialites) ? payload.specialites : [],
+          medecins: Array.isArray(payload.medecins) ? payload.medecins : [],
+          symptomes: Array.isArray(payload.symptomes) ? payload.symptomes : [],
+        });
+        if (allowSuggestionsRef.current) {
+          setSuggestionsOpen(true);
+        }
+        setActiveSuggestionIndex(-1);
+      } catch (error) {
+        if (error?.code === 'ERR_CANCELED') {
+          return;
+        }
+        console.error('Erreur suggestions recherche:', error);
+        setSuggestions({ specialites: [], medecins: [], symptomes: [] });
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [trimmedQuery, villeValue]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!searchContainerRef.current) {
+        return;
+      }
+      if (searchContainerRef.current.contains(event.target)) {
+        return;
+      }
+      allowSuggestionsRef.current = false;
+      setSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   const onSearchSubmit = (values) => {
     const params = new URLSearchParams();
     params.set('q', values.query);
     params.set('ville', values.ville);
     navigate(`/search?${params.toString()}`);
+  };
+
+  const handleSuggestionSelect = (row) => {
+    if (!row) {
+      return;
+    }
+
+    allowSuggestionsRef.current = false;
+    setSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+
+    if (row.type === 'medecin') {
+      navigate(`/doctor/${row.data.id}`);
+      return;
+    }
+
+    if (row.type === 'specialite') {
+      const params = new URLSearchParams();
+      params.set('specialite', row.data.nom);
+      if (villeValue) {
+        params.set('ville', villeValue);
+      }
+      navigate(`/search?${params.toString()}`);
+      return;
+    }
+
+    if (row.type === 'symptome') {
+      const params = new URLSearchParams();
+      params.set('specialite', row.data.specialite);
+      navigate(`/search?${params.toString()}`);
+      return;
+    }
+
+    if (row.type === 'all') {
+      const params = new URLSearchParams();
+      params.set('q', trimmedQuery);
+      if (villeValue) {
+        params.set('ville', villeValue);
+      }
+      navigate(`/search?${params.toString()}`);
+    }
+  };
+
+  const handleQueryKeyDown = (event) => {
+    if (!suggestionsOpen || trimmedQuery.length < 2) {
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) => {
+        const next = current + 1;
+        return next >= flatSuggestionRows.length ? 0 : next;
+      });
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) => {
+        const next = current - 1;
+        return next < 0 ? flatSuggestionRows.length - 1 : next;
+      });
+      return;
+    }
+
+    if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+      event.preventDefault();
+      handleSuggestionSelect(flatSuggestionRows[activeSuggestionIndex]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      allowSuggestionsRef.current = false;
+      setSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+    }
   };
 
   if (homeQuery.isLoading) {
@@ -446,6 +701,15 @@ function HomePage() {
     { label: 'Réservation rapide', Icon: CalendarDays },
     { label: 'Expérience premium', Icon: Sparkles },
   ];
+  const queryField = register('query');
+  const villeField = register('ville');
+  const activeSuggestionId =
+    activeSuggestionIndex >= 0 ? flatSuggestionRows[activeSuggestionIndex]?.id : undefined;
+  const hasSuggestions =
+    suggestions.specialites.length > 0 ||
+    suggestions.medecins.length > 0 ||
+    suggestions.symptomes.length > 0;
+  const showDropdown = suggestionsOpen && trimmedQuery.length >= 2;
 
   const specialtyCarouselItems = specialties.length ? [...specialties, ...specialties] : [];
 
@@ -470,7 +734,7 @@ function HomePage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55 }}
-        className="relative overflow-hidden rounded-[40px] bg-white shadow-2xl shadow-slate-200/50"
+        className="relative overflow-visible rounded-[40px] bg-white shadow-2xl shadow-slate-200/50"
       >
         <div className="flex flex-col lg:flex-row">
           {/* Left Content */}
@@ -496,21 +760,263 @@ function HomePage() {
               className="mt-10 space-y-4"
             >
               <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[280px]">
+                <div ref={searchContainerRef} className="relative flex-1 min-w-[280px]">
                   <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    {...register('query')}
+                    {...queryField}
+                    value={queryValue}
+                    onChange={(event) => {
+                      queryField.onChange(event);
+                      allowSuggestionsRef.current = true;
+                      const nextValue = event.target.value;
+                      if (nextValue.trim().length >= 2) {
+                        setSuggestionsOpen(true);
+                      } else {
+                        setSuggestionsOpen(false);
+                      }
+                      setActiveSuggestionIndex(-1);
+                    }}
+                    onFocus={() => {
+                      allowSuggestionsRef.current = true;
+                      if (trimmedQuery.length >= 2) {
+                        setSuggestionsOpen(true);
+                      }
+                    }}
+                    onKeyDown={handleQueryKeyDown}
+                    role="combobox"
+                    aria-expanded={showDropdown}
+                    aria-controls="home-search-suggestions"
+                    aria-activedescendant={activeSuggestionId}
+                    autoComplete="off"
                     className="h-[58px] w-full rounded-2xl border border-slate-100 bg-slate-50/50 pl-12 pr-4 text-base focus:border-[#1A6B8A] focus:outline-none focus:ring-4 focus:ring-[#1A6B8A]/10 placeholder:text-slate-400"
-                    placeholder="pédiatre Rabat..."
+                    placeholder="Symptôme ou spécialité..."
                   />
                   {errors.query && <p className="mt-1 text-xs text-red-500">{errors.query.message}</p>}
+
+                  {showDropdown ? (
+                    <div
+                      id="home-search-suggestions"
+                      role="listbox"
+                      className="absolute left-0 top-[calc(100%+8px)] z-[999] w-full max-h-[480px] overflow-y-auto rounded-2xl border border-[#eef0f3] bg-white shadow-[0_8px_40px_rgba(0,0,0,0.14)]"
+                      style={{ animation: 'fadeSlideDown 0.15s ease' }}
+                    >
+                      {suggestionsLoading ? (
+                        <div className="space-y-3 p-4">
+                          {Array.from({ length: 3 }).map((_, index) => (
+                            <div key={`skeleton-${index}`} className="space-y-2">
+                              <Skeleton className="h-4 w-2/3 rounded-lg" />
+                              <Skeleton className="h-3 w-1/2 rounded-lg" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : hasSuggestions ? (
+                        <div>
+                          {suggestionRows.specialites.length > 0 ? (
+                            <div>
+                              <div className="flex items-center gap-2 border-b border-[#F3F4F6] bg-[#FAFAFA] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.5px] text-slate-400">
+                                <suggestionGroupMeta.specialites.Icon size={13} />
+                                {suggestionGroupMeta.specialites.label}
+                              </div>
+                              {suggestionRows.specialites.map((row) => {
+                                const meta = getSpecialtyDisplayMeta(row.data.nom);
+                                const Icon = meta.Icon;
+                                const isActive = row.index === activeSuggestionIndex;
+                                const cityLabel = row.data.villes?.length
+                                  ? row.data.villes[0]
+                                  : villeValue || 'Maroc';
+
+                                return (
+                                  <button
+                                    key={row.id}
+                                    id={row.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isActive}
+                                    onMouseEnter={() => setActiveSuggestionIndex(row.index)}
+                                    onClick={() => handleSuggestionSelect(row)}
+                                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                      isActive ? 'bg-[#F0F7FA]' : 'hover:bg-[#F0F7FA]'
+                                    }`}
+                                  >
+                                    <span
+                                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/70"
+                                      style={{ backgroundColor: meta.backgroundColor, color: meta.color }}
+                                    >
+                                      <Icon size={16} />
+                                    </span>
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-medium text-[#0F1923]">
+                                        {formatSpecialtyLabel(row.data.nom)}
+                                      </span>
+                                      <span className="block text-xs text-slate-500">
+                                        {row.data.count} médecins · {cityLabel}
+                                      </span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+
+                          {suggestionRows.medecins.length > 0 ? (
+                            <div>
+                              <div className="flex items-center gap-2 border-y border-[#F3F4F6] bg-[#FAFAFA] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.5px] text-slate-400">
+                                <suggestionGroupMeta.medecins.Icon size={13} />
+                                {suggestionGroupMeta.medecins.label}
+                              </div>
+                              {suggestionRows.medecins.map((row) => {
+                                const isActive = row.index === activeSuggestionIndex;
+                                const initials = getInitials(row.data.nom);
+                                const availability = formatAvailabilityLabel(row.data.prochainDispo);
+                                const avatarUrl = resolveSuggestionImageUrl(row.data.profilePhotoUrl);
+                                return (
+                                  <button
+                                    key={row.id}
+                                    id={row.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isActive}
+                                    onMouseEnter={() => setActiveSuggestionIndex(row.index)}
+                                    onClick={() => handleSuggestionSelect(row)}
+                                    className={`flex w-full items-start gap-3 border-l-2 px-4 py-3 text-left transition-colors ${
+                                      isActive
+                                        ? 'border-[#1A6B8A] bg-[#F8FBFC]'
+                                        : 'border-transparent hover:border-[#1A6B8A] hover:bg-[#F8FBFC]'
+                                    }`}
+                                  >
+                                    {avatarUrl ? (
+                                      <img
+                                        src={avatarUrl}
+                                        alt={row.data.nom}
+                                        className="h-10 w-10 rounded-full object-cover ring-2 ring-[#1A6B8A]/15"
+                                        loading="lazy"
+                                        decoding="async"
+                                      />
+                                    ) : (
+                                      <span
+                                        className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white"
+                                        style={{ backgroundColor: hashColor(row.data.nom) }}
+                                      >
+                                        {initials || 'DR'}
+                                      </span>
+                                    )}
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-sm font-medium text-slate-900">
+                                        {row.data.nom}
+                                      </span>
+                                      <span className="mt-0.5 block text-xs text-slate-500">
+                                        {row.data.specialite} · {row.data.ville || 'Maroc'} · ⭐ {Number(row.data.note || 0).toFixed(1)} ·{' '}
+                                        {Number(row.data.tarif || 0).toLocaleString('fr-FR')} MAD
+                                      </span>
+                                      <span className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                        <span>{availability.text}</span>
+                                        {availability.isSoon ? (
+                                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                            Dispo cette semaine
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+
+                          {suggestionRows.symptomes.length > 0 ? (
+                            <div>
+                              <div className="flex items-center gap-2 border-y border-[#F3F4F6] bg-[#FAFAFA] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.5px] text-slate-400">
+                                <suggestionGroupMeta.symptomes.Icon size={13} />
+                                {suggestionGroupMeta.symptomes.label}
+                              </div>
+                              {suggestionRows.symptomes.map((row) => {
+                                const isActive = row.index === activeSuggestionIndex;
+                                return (
+                                  <button
+                                    key={row.id}
+                                    id={row.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={isActive}
+                                    onMouseEnter={() => setActiveSuggestionIndex(row.index)}
+                                    onClick={() => handleSuggestionSelect(row)}
+                                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
+                                      isActive ? 'bg-[#F0F7FA]' : 'hover:bg-[#F0F7FA]'
+                                    }`}
+                                  >
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F6] text-sm">
+                                      💊
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-sm font-semibold text-slate-900">
+                                        {row.data.symptome}
+                                      </span>
+                                      <span className="block text-xs text-[#1A6B8A]">
+                                        → {row.data.specialite} recommandé
+                                      </span>
+                                    </span>
+                                    <span className="mt-0.5 rounded-full bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-semibold text-[#7C3AED]">
+                                      Correspondance automatique
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 px-6 py-6 text-center">
+                          <div className="text-4xl">🔍</div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            Aucun résultat pour "{trimmedQuery}"
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Essayez un symptôme comme "mal de tête" ou "douleur dos"
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleSuggestionSelect(suggestionRows.all)}
+                            className="mt-2 rounded-full bg-[#1A6B8A] px-4 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Voir tous les médecins →
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="sticky bottom-0 border-t border-[#F3F4F6] bg-[#F8FBFC] px-4 py-2">
+                        <button
+                          type="button"
+                          id={suggestionRows.all.id}
+                          role="option"
+                          aria-selected={suggestionRows.all.index === activeSuggestionIndex}
+                          onMouseEnter={() => setActiveSuggestionIndex(suggestionRows.all.index)}
+                          onClick={() => handleSuggestionSelect(suggestionRows.all)}
+                          className={`flex w-full items-center gap-2 text-left text-sm font-semibold text-[#1A6B8A] ${
+                            suggestionRows.all.index === activeSuggestionIndex
+                              ? 'rounded-lg bg-[#F0F7FA] px-2 py-1'
+                              : ''
+                          }`}
+                        >
+                          🔍 Voir tous les résultats pour "{trimmedQuery}"
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="relative w-full md:w-[200px]">
                   <select
-                    {...register('ville')}
+                    {...villeField}
+                    value={villeValue}
+                    onChange={(event) => {
+                      villeField.onChange(event);
+                      allowSuggestionsRef.current = true;
+                      setActiveSuggestionIndex(-1);
+                      if (trimmedQuery.length >= 2) {
+                        setSuggestionsOpen(true);
+                      }
+                    }}
                     className="h-[58px] w-full appearance-none rounded-2xl border border-slate-100 bg-slate-50/50 px-4 pr-10 text-base focus:border-[#1A6B8A] focus:outline-none focus:ring-4 focus:ring-[#1A6B8A]/10"
-                    defaultValue=""
                   >
                     <option value="" disabled>Toutes les villes</option>
                     {cityOptions.map(city => <option key={city} value={city}>{city}</option>)}
@@ -533,7 +1039,7 @@ function HomePage() {
           </div>
 
           {/* Right Image */}
-          <div className="relative hidden w-full bg-[#E5F6F6] lg:block lg:w-[45%]">
+          <div className="relative hidden w-full overflow-hidden rounded-r-[40px] bg-[#E5F6F6] lg:block lg:w-[45%]">
             <img
               src="/docs/screenshots/couverture_tabibconnect.jpeg"
               alt="TabibConnect - Votre plateforme de santé"

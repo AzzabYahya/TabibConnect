@@ -1,9 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   Filter,
   MapPinned,
+  RotateCcw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -15,7 +17,6 @@ import {
   Clock,
 } from 'lucide-react';
 
-import AccessPromptModal from '../components/common/AccessPromptModal';
 import Skeleton from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
@@ -27,7 +28,8 @@ const DoctorSearchMap = lazy(() => import('../components/common/DoctorSearchMap'
 const maxTarifLimit = 2000;
 const resultsPerPage = 8;
 
-const specialtyOptions = [
+const fallbackCityOptions = ['Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès'];
+const fallbackSpecialtyOptions = [
   'Médecine générale',
   'Cardiologie',
   'Dermatologie',
@@ -40,13 +42,7 @@ const specialtyOptions = [
   'Pneumologie',
 ];
 
-const cityOptions = ['Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès'];
-
-const languageOptions = [
-  { label: 'Arabe', value: 'ARABE' },
-  { label: 'Français', value: 'FRANCAIS' },
-  { label: 'Amazigh', value: 'AMAZIGH' },
-];
+const fallbackLanguageOptions = ['Français', 'Arabe', 'Darija', 'Anglais'];
 
 const sortOptions = [
   { label: 'Pertinence', value: 'pertinence' },
@@ -68,15 +64,6 @@ const createDefaultFilters = (searchParams) => ({
   noteMin: 0,
 });
 
-const normalizeDoctorLanguage = (value = '') => {
-  const normalized = String(value).trim().toLowerCase();
-  if (!normalized) return '';
-  if (normalized.includes('amazigh') || normalized.includes('tamazight')) return 'AMAZIGH';
-  if (normalized.includes('fran') || normalized.includes('french')) return 'FRANCAIS';
-  if (normalized.includes('darija') || normalized.includes('arabe')) return 'ARABE';
-  return normalized.toUpperCase();
-};
-
 const getInitials = (name = '') =>
   String(name)
     .trim()
@@ -85,13 +72,6 @@ const getInitials = (name = '') =>
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join('') || 'TC';
-
-const inferGender = (doctor) => {
-  const text = `${doctor.nomComplet || ''} ${doctor.user?.email || ''}`.toLowerCase();
-  if (/(salma|khadija|fatima|meryem|nadia)/.test(text)) return 'FEMME';
-  if (/(amine|youssef|omar|hamza|karim)/.test(text)) return 'HOMME';
-  return 'TOUT';
-};
 
 const inferTeleconsultation = (doctor) => {
   if (typeof doctor.bio === 'string' && /tele/i.test(doctor.bio)) return true;
@@ -128,7 +108,68 @@ function SearchPage() {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 1 });
-  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [mapQuery, setMapQuery] = useState('');
+
+  /** Reset all filters and sort back to defaults */
+  const handleResetFilters = () => {
+    setFilters(createDefaultFilters(new URLSearchParams()));
+    setSortBy('pertinence');
+    setCurrentPage(1);
+  };
+
+  /** Count how many filters are actively set (for the badge) */
+  const defaultState = createDefaultFilters(new URLSearchParams());
+  const activeFilterCount = [
+    filters.query !== defaultState.query,
+    filters.ville !== defaultState.ville,
+    filters.specialite !== defaultState.specialite,
+    filters.tarifMax < maxTarifLimit,
+    filters.sexe !== 'TOUT',
+    filters.langues.length > 0,
+    filters.assuranceOnly,
+    filters.videoOnly,
+    filters.noteMin > 0,
+  ].filter(Boolean).length;
+
+  const citiesQuery = useQuery({
+    queryKey: ['home-cities'],
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    queryFn: async () => {
+      const response = await api.get('/home/summary');
+      return response.data?.data || {};
+    },
+  });
+
+  const cityOptions = useMemo(() => {
+    const cities = Array.isArray(citiesQuery.data?.cities) ? citiesQuery.data.cities : [];
+    return cities.length ? cities : fallbackCityOptions;
+  }, [citiesQuery.data]);
+
+  const filtersQuery = useQuery({
+    queryKey: ['search-filters'],
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    queryFn: async () => {
+      const response = await api.get('/search/filters');
+      return response.data?.data || {};
+    },
+  });
+
+  const specialtyOptions = useMemo(() => {
+    const specialties = Array.isArray(filtersQuery.data?.specialites)
+      ? filtersQuery.data.specialites
+      : [];
+    return specialties.length ? specialties : fallbackSpecialtyOptions;
+  }, [filtersQuery.data]);
+
+  const languageOptions = useMemo(() => {
+    const languages = Array.isArray(filtersQuery.data?.langues)
+      ? filtersQuery.data.langues
+      : [];
+    const values = languages.length ? languages : fallbackLanguageOptions;
+    return values.map((value) => ({ label: value, value }));
+  }, [filtersQuery.data]);
 
   const normalizeDoctorList = (payload) => {
     if (Array.isArray(payload)) {
@@ -163,6 +204,8 @@ function SearchPage() {
           accepteAssurance: filters.assuranceOnly || undefined,
           minNote: filters.noteMin > 0 ? filters.noteMin : undefined,
           videoOnly: filters.videoOnly || undefined,
+          sexe: filters.sexe !== 'TOUT' ? filters.sexe : undefined,
+          langues: filters.langues.length ? filters.langues.join(',') : undefined,
         };
 
 
@@ -197,75 +240,34 @@ function SearchPage() {
 
 
   const handleBooking = (doctor) => {
-    if (!session?.user) {
-      setShowAccessModal(true);
-      return;
-    }
     navigate(`/doctor/${doctor.id}`);
   };
 
-  const filteredDoctors = useMemo(() => {
-    let result = Array.isArray(doctors) ? [...doctors] : [];
-
-    if (filters.ville) {
-      result = result.filter((doc) => {
-        const docVille = (doc.doctorCabinets || []).some(dc => 
-          dc.cabinet?.ville?.toLowerCase().includes(filters.ville.toLowerCase())
-        );
-        return docVille;
-      });
-    }
-
-    if (filters.specialite) {
-      result = result.filter((doc) => 
-        doc.specialite?.toLowerCase().includes(filters.specialite.toLowerCase())
-      );
-    }
-
-    if (filters.tarifMax < maxTarifLimit) {
-      result = result.filter((doc) => Number(doc.tarifConsultation || 0) <= filters.tarifMax);
-    }
-
-    if (filters.sexe !== 'TOUT') {
-      result = result.filter((doc) => inferGender(doc) === filters.sexe);
-    }
-
-    if (filters.langues.length > 0) {
-      result = result.filter((doc) => {
-        const langs = (Array.isArray(doc.languesParlees) ? doc.languesParlees : []).map(normalizeDoctorLanguage);
-        return filters.langues.some((lang) => langs.includes(lang));
-      });
-    }
-
-    if (filters.assuranceOnly) {
-      result = result.filter((doc) => Boolean(doc.accepteAssurance));
-    }
-
-    if (filters.videoOnly) {
-      result = result.filter((doc) => inferTeleconsultation(doc));
-    }
-
-    if (filters.noteMin > 0) {
-      result = result.filter((doc) => Number(doc.ratingAverage || 0) >= filters.noteMin);
-    }
-
+  const sortedDoctors = useMemo(() => {
+    const result = Array.isArray(doctors) ? [...doctors] : [];
 
     if (sortBy === 'tarif') {
       result.sort((a, b) => Number(a.tarifConsultation || 0) - Number(b.tarifConsultation || 0));
     } else if (sortBy === 'note') {
-      result.sort((a, b) => Number(b.ratingAverage || 0) - Number(a.ratingAverage || 0));
+      const getRating = (doctor) => Number(doctor.ratingAverage ?? doctor.rating?.average ?? 0);
+      result.sort((a, b) => getRating(b) - getRating(a));
     }
 
     return result;
-  }, [doctors, filters, sortBy]);
+  }, [doctors, sortBy]);
 
   // Build map marker points from doctor cabinet GPS data
   const markerPoints = useMemo(() => {
-    const points = [];
-    const seenCabinets = new Set();
+    const cabinetsById = new Map();
 
-    filteredDoctors.forEach((doctor) => {
+    sortedDoctors.forEach((doctor) => {
       const cabinets = doctor.doctorCabinets || [];
+      const doctorName = doctor.nomComplet || 'Dr.';
+      const specialtyLabel = doctor.specialite || '';
+      const tarifLabel = doctor.tarifConsultation
+        ? `${Number(doctor.tarifConsultation).toLocaleString('fr-FR')} MAD`
+        : 'Tarif non renseigné';
+
       cabinets.forEach((dc) => {
         const cab = dc.cabinet;
         if (!cab || cab.latitude == null || cab.longitude == null) return;
@@ -274,51 +276,59 @@ function SearchPage() {
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
         const cabinetKey = cab.id;
-        if (seenCabinets.has(cabinetKey)) {
-          // Add doctor info to existing cabinet marker
-          const existing = points.find((p) => p.cabinetId === cabinetKey);
-          if (existing) {
-            existing.doctorNames.push(doctor.nomComplet || 'Dr.');
-            if (doctor.specialite && !existing.specialties.includes(doctor.specialite)) {
-              existing.specialties.push(doctor.specialite);
-            }
-          }
-          return;
-        }
+        const current = cabinetsById.get(cabinetKey) || {
+          coords: [lat, lng],
+          cabinetName: cab.nom || '',
+          ville: cab.ville || '',
+          cabinetId: cabinetKey,
+          doctorsMap: new Map(),
+        };
 
-        seenCabinets.add(cabinetKey);
+        current.doctorsMap.set(doctor.id, {
+          id: doctor.id,
+          name: doctorName,
+          specialty: specialtyLabel,
+          tarifLabel,
+        });
 
-        if (cabinets.length === 1) {
-          // Single cabinet — show individual doctor marker
-          points.push({
-            coords: [lat, lng],
-            doctorName: doctor.nomComplet || 'Dr.',
-            specialty: doctor.specialite || '',
-            tarifLabel: doctor.tarifConsultation
-              ? `${Number(doctor.tarifConsultation).toLocaleString('fr-FR')} MAD`
-              : 'Tarif non renseigné',
-            ville: cab.ville || '',
-            cabinetName: cab.nom || '',
-            cabinetId: cabinetKey,
-            profileHref: `/doctor/${doctor.id}`,
-            doctorId: doctor.id,
-          });
-        } else {
-          // Multi-doctor cabinet
-          points.push({
-            coords: [lat, lng],
-            doctorNames: [doctor.nomComplet || 'Dr.'],
-            specialties: doctor.specialite ? [doctor.specialite] : [],
-            ville: cab.ville || '',
-            cabinetName: cab.nom || '',
-            cabinetId: cabinetKey,
-          });
-        }
+        cabinetsById.set(cabinetKey, current);
       });
     });
 
-    return points;
-  }, [filteredDoctors]);
+    return Array.from(cabinetsById.values()).map(({ doctorsMap, ...rest }) => {
+      const doctorsList = Array.from(doctorsMap.values());
+      return {
+        ...rest,
+        doctors: doctorsList,
+        doctorName: doctorsList.length === 1 ? doctorsList[0].name : undefined,
+        specialty: doctorsList.length === 1 ? doctorsList[0].specialty : undefined,
+        tarifLabel: doctorsList.length === 1 ? doctorsList[0].tarifLabel : undefined,
+        doctorId: doctorsList.length === 1 ? doctorsList[0].id : undefined,
+        profileHref: doctorsList.length === 1 ? `/doctor/${doctorsList[0].id}` : undefined,
+      };
+    });
+  }, [sortedDoctors]);
+
+  const normalizedMapQuery = mapQuery.trim().toLowerCase();
+  const filteredMarkerPoints = useMemo(() => {
+    if (!normalizedMapQuery) {
+      return markerPoints;
+    }
+
+    return markerPoints.filter((marker) => {
+      const fields = [marker.cabinetName, marker.ville];
+      
+      if (Array.isArray(marker.doctors)) {
+        marker.doctors.forEach((doc) => {
+          fields.push(doc.name, doc.specialty);
+        });
+      }
+
+      return fields
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedMapQuery));
+    });
+  }, [markerPoints, normalizedMapQuery]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
@@ -409,18 +419,36 @@ function SearchPage() {
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wide">
                   <SlidersHorizontal size={15} className="text-[#1A6B8A]" /> Filtres
                 </h3>
-                {showFiltersModal && (
-                  <button
-                    onClick={() => setShowFiltersModal(false)}
-                    className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={handleResetFilters}
+                      className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-all hover:bg-red-100 hover:text-red-700"
+                      title="Réinitialiser tous les filtres"
+                    >
+                      <RotateCcw size={12} />
+                      Réinitialiser
+                    </button>
+                  )}
+                  {showFiltersModal && (
+                    <button
+                      onClick={() => setShowFiltersModal(false)}
+                      className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tarif maximum</h4>
+              {/* Section 1: Budget limit */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tarif maximum</h4>
+                  <span className="text-xs font-semibold text-[#1A6B8A] bg-[#1A6B8A]/5 px-2 py-0.5 rounded-lg">
+                    {Number(filters.tarifMax).toLocaleString('fr-FR')} MAD
+                  </span>
+                </div>
                 <input
                   type="range"
                   min="100"
@@ -428,90 +456,150 @@ function SearchPage() {
                   step="50"
                   value={filters.tarifMax}
                   onChange={(e) => setFilters((current) => ({ ...current, tarifMax: Number(e.target.value) }))}
-                  className="mt-2 w-full accent-[#1A6B8A]"
+                  className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#1A6B8A] transition-all hover:bg-slate-200"
                 />
-                <p className="mt-1 text-sm font-medium text-[#1A6B8A]">Jusqu'à {Number(filters.tarifMax).toLocaleString('fr-FR')} MAD</p>
               </div>
 
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sexe du médecin</h4>
-                <div className="mt-2 flex gap-1.5">
-                  {['TOUT', 'HOMME', 'FEMME'].map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => setFilters((current) => ({ ...current, sexe: value }))}
-                      className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${filters.sexe === value
-                          ? 'bg-[#1A6B8A] text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              {/* Divider */}
+              <div className="border-t border-slate-100/80 my-2" />
+
+              {/* Section 2: Gender Selector */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sexe du médecin</h4>
+                <div className="flex p-1 bg-slate-50/80 rounded-2xl border border-slate-200/40">
+                  {['TOUT', 'HOMME', 'FEMME'].map((value) => {
+                    const isSelected = filters.sexe === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFilters((current) => ({ ...current, sexe: value }))}
+                        className={`flex-1 text-center py-2 text-xs font-bold rounded-xl transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-[#1A6B8A] text-white shadow-sm shadow-[#1A6B8A]/20 scale-[1.02]'
+                            : 'text-slate-500 hover:text-slate-800'
                         }`}
-                    >
-                      {value === 'TOUT' ? 'Tous' : value === 'HOMME' ? 'Homme' : 'Femme'}
-                    </button>
-                  ))}
+                      >
+                        {value === 'TOUT' ? 'Tous' : value === 'HOMME' ? 'Homme' : 'Femme'}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Langue</h4>
-                <div className="mt-2 space-y-2">
-                  {languageOptions.map((option) => (
-                    <label key={option.value} className="flex items-center gap-2 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={filters.langues.includes(option.value)}
-                        onChange={(e) => {
+              {/* Divider */}
+              <div className="border-t border-slate-100/80 my-2" />
+
+              {/* Section 3: Dynamic Language Selection with Beautiful Badges */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Langues parlées</h4>
+                <div className="flex flex-wrap gap-2">
+                  {languageOptions.map((option) => {
+                    const isSelected = filters.langues.includes(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
                           setFilters((current) => ({
                             ...current,
-                            langues: e.target.checked
-                              ? [...current.langues, option.value]
-                              : current.langues.filter((v) => v !== option.value),
+                            langues: isSelected
+                              ? current.langues.filter((v) => v !== option.value)
+                              : [...current.langues, option.value],
                           }));
                         }}
-                        className="rounded border-slate-300 text-[#1A6B8A] accent-[#1A6B8A]"
-                      />
-                      <span className="text-sm text-slate-600 group-hover:text-slate-800 transition-colors">{option.label}</span>
-                    </label>
-                  ))}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-[#1A6B8A]/10 text-[#1A6B8A] border-[#1A6B8A]/35 shadow-sm shadow-[#1A6B8A]/5'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800'
+                        }`}
+                      >
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#1A6B8A] animate-pulse" />}
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={Boolean(filters.assuranceOnly)}
-                  onChange={(e) => setFilters((current) => ({ ...current, assuranceOnly: e.target.checked }))}
-                  className="rounded border-slate-300 text-[#1A6B8A] accent-[#1A6B8A]"
-                />
-                <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">Accepte mon assurance</span>
-              </label>
+              {/* Divider */}
+              <div className="border-t border-slate-100/80 my-2" />
 
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={Boolean(filters.videoOnly)}
-                  onChange={(e) => setFilters((current) => ({ ...current, videoOnly: e.target.checked }))}
-                  className="rounded border-slate-300 text-[#1A6B8A] accent-[#1A6B8A]"
-                />
-                <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">Disponible en vidéo</span>
-              </label>
+              {/* Section 4: Separate Services & Options with iOS switches */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Services & Options</h4>
+                
+                {/* Switch: Assurance */}
+                <div className="flex items-center justify-between py-1 group cursor-pointer" onClick={() => setFilters((current) => ({ ...current, assuranceOnly: !current.assuranceOnly }))}>
+                  <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">
+                    Accepte mon assurance
+                  </span>
+                  <button
+                    type="button"
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      filters.assuranceOnly ? 'bg-[#1A6B8A]' : 'bg-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        filters.assuranceOnly ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
 
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Note minimale</h4>
-                <div className="mt-2 flex items-center gap-1">
-                  {Array.from({ length: 5 }, (_, i) => i + 1).map((value) => (
-                    <button
-                      key={value}
-                      onClick={() =>
-                        setFilters((current) => ({
-                          ...current,
-                          noteMin: current.noteMin === value ? 0 : value,
-                        }))
-                      }
-                      className={`text-xl transition-transform hover:scale-110 ${Number(filters.noteMin) >= value ? 'text-amber-400' : 'text-slate-300'}`}
-                    >
-                      ★
-                    </button>
-                  ))}
+                {/* Switch: Teleconsultation */}
+                <div className="flex items-center justify-between py-1 group cursor-pointer" onClick={() => setFilters((current) => ({ ...current, videoOnly: !current.videoOnly }))}>
+                  <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">
+                    Disponible en vidéo
+                  </span>
+                  <button
+                    type="button"
+                    className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      filters.videoOnly ? 'bg-[#1A6B8A]' : 'bg-slate-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        filters.videoOnly ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-slate-100/80 my-2" />
+
+              {/* Section 5: Note minimale */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Note minimale</h4>
+                <div className="flex items-center gap-1.5 py-1">
+                  {Array.from({ length: 5 }, (_, i) => i + 1).map((value) => {
+                    const isFilled = Number(filters.noteMin) >= value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() =>
+                          setFilters((current) => ({
+                            ...current,
+                            noteMin: current.noteMin === value ? 0 : value,
+                          }))
+                        }
+                        className={`text-2xl transition-all duration-150 transform hover:scale-125 ${
+                          isFilled ? 'text-amber-400 drop-shadow-sm scale-110' : 'text-slate-200 hover:text-amber-200'
+                        }`}
+                      >
+                        ★
+                      </button>
+                    );
+                  })}
+                  {filters.noteMin > 0 && (
+                    <span className="text-xs font-bold text-slate-400 ml-2 animate-fadeIn">
+                      {filters.noteMin}+
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -542,6 +630,22 @@ function SearchPage() {
                   <Filter size={16} /> Filtres
                 </Button>
 
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleResetFilters}
+                  className="gap-2"
+                  disabled={activeFilterCount === 0}
+                >
+                  <RotateCcw size={14} />
+                  Réinitialiser
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1A6B8A] text-[10px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -568,7 +672,7 @@ function SearchPage() {
                   </div>
                 ))}
               </div>
-            ) : filteredDoctors.length === 0 ? (
+            ) : sortedDoctors.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50/50 px-6 py-16 text-center shadow-sm">
                 <div className="rounded-2xl bg-amber-100/80 p-4">
                   <Sparkles className="h-8 w-8 text-amber-600" />
@@ -580,7 +684,7 @@ function SearchPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {filteredDoctors.map((doctor) => (
+                {sortedDoctors.map((doctor) => (
                   <div
                     key={doctor.id}
                     className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 hover:border-[#1A6B8A]/20 hover:shadow-lg hover:shadow-[#1A6B8A]/5 hover:-translate-y-0.5"
@@ -690,11 +794,33 @@ function SearchPage() {
             )}
 
             {/* Map Section */}
-            {!loading && filteredDoctors.length > 0 && (
+            {!loading && sortedDoctors.length > 0 && (
               <div className="mt-10">
-                <div className="mb-4 flex items-center gap-2">
-                  <MapPinned size={18} className="text-[#1A6B8A]" />
-                  <h3 className="text-lg font-bold text-slate-900">Localisation des médecins</h3>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPinned size={18} className="text-[#1A6B8A]" />
+                    <h3 className="text-lg font-bold text-slate-900">Localisation des médecins</h3>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200/60 bg-white px-3 py-2 text-sm shadow-sm">
+                    <Search size={16} className="text-[#1A6B8A]" />
+                    <input
+                      type="text"
+                      value={mapQuery}
+                      onChange={(event) => setMapQuery(event.target.value)}
+                      className="w-[200px] bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      placeholder="Rechercher sur la carte..."
+                    />
+                    {mapQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => setMapQuery('')}
+                        className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        aria-label="Effacer la recherche"
+                      >
+                        <X size={14} />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <Suspense
                   fallback={
@@ -707,11 +833,11 @@ function SearchPage() {
                   }
                 >
                   <DoctorSearchMap
-                    markerPoints={markerPoints}
+                    markerPoints={filteredMarkerPoints}
                     className="h-[400px]"
                     onMarkerProfileClick={(marker) => {
-                      if (marker.doctorId) {
-                        navigate(`/doctor/${marker.doctorId}`);
+                      if (marker?.doctorId) {
+                        handleBooking({ id: marker.doctorId });
                       }
                     }}
                   />
@@ -722,7 +848,6 @@ function SearchPage() {
         </div>
       </div>
 
-      <AccessPromptModal isOpen={showAccessModal} onClose={() => setShowAccessModal(false)} />
     </div>
   );
 }

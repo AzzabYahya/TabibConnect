@@ -1,8 +1,10 @@
 const crypto = require('crypto');
+const path = require('path');
 const prisma = require('../config/prisma');
 const env = require('../config/env');
 const HttpError = require('../utils/httpError');
 const { createNotification } = require('./notificationService');
+const { mapOrdonnanceForClient } = require('./ordonnanceService');
 const { createCheckoutSession } = require('./paymentGatewayService');
 const { computeDoctorAvailabilitiesByDate } = require('./availabilityService');
 const {
@@ -34,6 +36,22 @@ const getDateISO = (date) => date.toISOString().slice(0, 10);
 
 const intervalsOverlap = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd;
 const PAYMENT_SETTLED_STATUSES = ['PAYE', 'REMBOURSE'];
+
+const formatDisplayNameFromEmail = (email) => {
+  const localPart = String(email || '').split('@')[0] || '';
+  return localPart
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const parseAntecedentsTags = (value) => {
+  if (!value) return [];
+  return String(value)
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
 
 const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
@@ -145,6 +163,7 @@ const getAppointmentByIdWithActors = async (appointmentId) => {
           antecedents: true,
           dateOfNaissance: true,
           sexe: true,
+          groupeSanguin: true,
           ville: true,
           user: {
             select: {
@@ -156,12 +175,26 @@ const getAppointmentByIdWithActors = async (appointmentId) => {
           },
         },
       },
+      ordonnance: {
+        select: {
+          id: true,
+          medicaments: true,
+          instructions: true,
+          renouvelable: true,
+          qrCode: true,
+          pdfPath: true,
+          uploadedFile: true,
+          createdAt: true,
+        },
+      },
       doctor: {
         select: {
           id: true,
           userId: true,
           nomComplet: true,
           specialite: true,
+          inpe: true,
+          languesParlees: true,
           tarifConsultation: true,
           user: {
             select: {
@@ -196,6 +229,14 @@ const getAppointmentByIdWithActors = async (appointmentId) => {
 const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
   const appointment = await getAppointmentByIdWithActors(appointmentId);
   let patientProfile = null;
+
+  const [doctorReviewAggregate] = await Promise.all([
+    prisma.avis.aggregate({
+      where: { doctorId: appointment.doctorId },
+      _avg: { note: true },
+      _count: { _all: true },
+    }),
+  ]);
 
   if (role === 'PATIENT') {
     const patient = await getPatientContext(userId);
@@ -251,12 +292,21 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
       }),
     ]);
 
+    const patientDisplayName = formatDisplayNameFromEmail(appointment.patient.user.email);
+
     patientProfile = {
       id: appointment.patient.id,
+      fullName: patientDisplayName,
       email: appointment.patient.user.email,
       phone: appointment.patient.user.phone || null,
       city: appointment.patient.ville || null,
+      dateOfBirth: appointment.patient.dateOfNaissance
+        ? appointment.patient.dateOfNaissance.toISOString()
+        : null,
+      sex: appointment.patient.sexe || null,
+      bloodGroup: appointment.patient.groupeSanguin || null,
       antecedents: appointment.patient.antecedents || null,
+      antecedentTags: parseAntecedentsTags(appointment.patient.antecedents),
       warnings: appointment.patient.bookingWarnings || 0,
       historyAppointments: historyAppointments.map((item) => ({
         id: item.id,
@@ -297,6 +347,12 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
       }
     : null;
 
+  const ordonnance = mapOrdonnanceForClient(appointment.ordonnance);
+
+  const patientFirstName = appointment.patient?.user?.email
+    ? formatDisplayNameFromEmail(appointment.patient.user.email).split(' ')[0]
+    : 'Patient';
+
   return {
     id: appointment.id,
     status: appointment.statut,
@@ -311,7 +367,8 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
     patient: appointment.patient
       ? {
           id: appointment.patient.id,
-          name: appointment.patient.user.email,
+          name: formatDisplayNameFromEmail(appointment.patient.user.email),
+          firstName: patientFirstName,
           email: appointment.patient.user.email,
           warnings: appointment.patient.bookingWarnings || 0,
           lastNoShowAt: appointment.patient.lastNoShowAt ? appointment.patient.lastNoShowAt.toISOString() : null,
@@ -321,7 +378,11 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
       id: appointment.doctorId,
       name: appointment.doctor.nomComplet || appointment.doctor.user.email,
       specialty: appointment.doctor.specialite,
+      inpe: appointment.doctor.inpe || null,
+      languages: appointment.doctor.languesParlees || [],
       fee: Number(appointment.doctor.tarifConsultation),
+      averageRating: doctorReviewAggregate._avg.note ? Number(doctorReviewAggregate._avg.note) : 0,
+      reviewCount: doctorReviewAggregate._count._all || 0,
     },
     cabinet: appointment.cabinet
       ? {
@@ -329,6 +390,9 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
           name: appointment.cabinet.nom,
           address: appointment.cabinet.adresse,
           city: appointment.cabinet.ville,
+          phone: appointment.cabinet.phone || null,
+          latitude: appointment.cabinet.latitude ? Number(appointment.cabinet.latitude) : null,
+          longitude: appointment.cabinet.longitude ? Number(appointment.cabinet.longitude) : null,
           label: cabinetLabel,
         }
       : null,
@@ -348,7 +412,10 @@ const getAppointmentDetails = async ({ appointmentId, userId, role }) => {
         }
       : null,
     joinUrl: null,
+    ordonnance,
     patientProfile,
+    freeCancellationHours: env.freeCancellationHours,
+    reminderHoursBefore: env.reminderHoursBefore,
   };
 };
 
@@ -603,6 +670,11 @@ const createAppointment = async ({ userId, payload }) => {
         userId: created.patient?.userId,
         type: 'SYSTEME',
         message: 'Passerelle carte indisponible actuellement. Votre rendez-vous est enregistré.',
+        metadata: {
+          appointmentId: created.id,
+          category: 'PAIEMENT',
+          event: 'GATEWAY_UNAVAILABLE',
+        },
       });
       resultPayload = { ...created, paymentCheckoutUrl: null };
       await sendAppointmentCreatedNotifications(resultPayload);
@@ -630,6 +702,11 @@ const createAppointment = async ({ userId, payload }) => {
       userId: created.patient?.userId,
       type: 'SYSTEME',
       message: 'Paiement en espèces à régler sur place avant la consultation.',
+      metadata: {
+        appointmentId: created.id,
+        category: 'PAIEMENT',
+        event: 'CASH',
+      },
     });
   }
   await sendAppointmentCreatedNotifications(resultPayload);

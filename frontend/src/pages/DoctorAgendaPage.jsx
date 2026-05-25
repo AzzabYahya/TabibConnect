@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 
 
 import Badge from '../components/ui/Badge';
@@ -79,6 +80,15 @@ function DoctorAgendaPage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Confirmation impossible.'),
   });
 
+  const completeMutation = useMutation({
+    mutationFn: async (appointmentId) => api.put(`/appointments/${appointmentId}/complete`),
+    onSuccess: async () => {
+      toast.success('RDV marqué comme complété.');
+      await query.refetch();
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || 'Mise à jour impossible.'),
+  });
+
   const cancelMutation = useMutation({
     mutationFn: async ({ appointmentId, reason }) => api.put(`/appointments/${appointmentId}/cancel`, { reason }),
     onSuccess: async () => {
@@ -98,7 +108,30 @@ function DoctorAgendaPage() {
     onError: (error) => toast.error(error?.response?.data?.message || 'Ajout note impossible.'),
   });
 
+  const handleCompleteAppointment = (appointmentId) => {
+    if (!window.confirm('Marquer ce rendez-vous comme complété ?')) {
+      return;
+    }
+
+    completeMutation.mutate(appointmentId);
+  };
+
   const items = query.data?.items || [];
+
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+
+    const refreshed = items.find((item) => item.id === selected.id);
+    if (!refreshed) {
+      setSelected(null);
+      return;
+    }
+
+    setSelected(refreshed);
+  }, [items, selected]);
+
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => new Date(addDaysISO(weekStart, i))),
     [weekStart]
@@ -254,6 +287,13 @@ function DoctorAgendaPage() {
                 disabled={cancelMutation.isPending || cancelReason.trim().length < 3 || !['EN_ATTENTE', 'CONFIRME'].includes(selected.status)}
               >
                 {t('dashboard.agenda.cancel')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleCompleteAppointment(selected.id)}
+                disabled={completeMutation.isPending || selected.status !== 'CONFIRME'}
+              >
+                Marquer complété
               </Button>
               <Button
                 variant="outline"

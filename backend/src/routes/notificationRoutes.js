@@ -5,21 +5,52 @@ const authenticate = require('../middlewares/authenticate');
 const asyncHandler = require('../utils/asyncHandler');
 const prisma = require('../config/prisma');
 const validateRequest = require('../middlewares/validateRequest');
+const { mapNotification } = require('../utils/notificationMapper');
 
 const router = express.Router();
 
 router.use(authenticate);
 
+const categoryTypeMap = {
+  RENDEZ_VOUS: ['RAPPEL_RDV', 'RDV_CONFIRME', 'RDV_ANNULE'],
+  PAIEMENT: ['PAIEMENT_RECU'],
+};
+
 router.get(
   '/',
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+  query('type').optional().isIn(['RAPPEL_RDV', 'RDV_CONFIRME', 'RDV_ANNULE', 'PAIEMENT_RECU', 'SYSTEME']),
+  query('category').optional().isIn(['RENDEZ_VOUS', 'PAIEMENT', 'ORDONNANCE', 'SYSTEME']),
+  validateRequest,
   asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 20;
     const userId = req.user.id;
-    
-    console.log(`[NotificationRoute] Fetching for userId: ${userId}, page: ${page}`);
+    const type = req.query.type ? String(req.query.type) : null;
+    const category = req.query.category ? String(req.query.category) : null;
 
     const where = { userId };
+
+    if (type) {
+      where.type = type;
+    } else if (category === 'ORDONNANCE') {
+      where.type = 'SYSTEME';
+      where.metadata = { path: ['category'], equals: 'ORDONNANCE' };
+    } else if (category === 'SYSTEME') {
+      where.AND = [
+        { type: 'SYSTEME' },
+        {
+          OR: [
+            { metadata: { equals: null } },
+            { NOT: { metadata: { path: ['category'], equals: 'ORDONNANCE' } } },
+          ],
+        },
+      ];
+    } else if (category && categoryTypeMap[category]) {
+      where.type = { in: categoryTypeMap[category] };
+    }
+
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
         where,
@@ -30,36 +61,9 @@ router.get(
       prisma.notification.count({ where }),
     ]);
 
-    console.log(`[NotificationRoute] Found ${notifications.length} notifications (total: ${total})`);
-
-    // Standardize to mapped format used by dashboards
-    const notificationTitles = {
-      RAPPEL_RDV: 'Rappel de rendez-vous',
-      RDV_CONFIRME: 'Rendez-vous confirme',
-      RDV_ANNULE: 'Rendez-vous annule',
-      PAIEMENT_RECU: 'Paiement recu',
-      SYSTEME: 'Information systeme',
-    };
-
-    const buildRelativeLabel = (dateValue) => {
-      const date = new Date(dateValue);
-      const diffInMinutes = Math.round((Date.now() - date.getTime()) / (1000 * 60));
-      if (diffInMinutes < 1) return 'À l\'instant';
-      if (diffInMinutes < 60) return `Il y a ${diffInMinutes} min`;
-      const diffInHours = Math.round(diffInMinutes / 60);
-      if (diffInHours < 24) return `Il y a ${diffInHours} h`;
-      return date.toLocaleDateString('fr-MA', { day: '2-digit', month: 'short' });
-    };
-
-    const items = notifications.map(n => ({
-      id: n.id,
-      type: n.type,
-      title: notificationTitles[n.type] || 'Notification',
-      body: n.message,
-      time: buildRelativeLabel(n.createdAt),
-      createdAt: n.createdAt,
-      isRead: n.isRead,
-    }));
+    const items = notifications.map((notification) =>
+      mapNotification(notification, { userRole: req.user.role })
+    );
 
     res.status(200).json({
       status: 'success',

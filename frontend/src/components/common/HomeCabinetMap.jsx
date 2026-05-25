@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import Card from '../ui/Card';
 import Skeleton from '../ui/Skeleton';
@@ -14,20 +15,36 @@ const toSafeNumber = (value) => {
 };
 
 function HomeCabinetMap() {
+  const navigate = useNavigate();
   const doctorsQuery = useQuery({
     queryKey: ['home-cabinet-map'],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     retry: 1,
     queryFn: async () => {
-      const response = await api.get('/doctors', { params: { limit: 200 } });
-      const payload = response.data?.data;
+      const fetchPage = async (page) => {
+        const response = await api.get('/doctors', { params: { limit: 200, page } });
+        const payload = response.data?.data;
+        if (payload && Array.isArray(payload.items)) {
+          return { items: payload.items, pagination: payload.pagination };
+        }
+        return { items: Array.isArray(payload) ? payload : [], pagination: { pages: 1 } };
+      };
 
-      // Handle paginated response format: { items: [...], pagination: {...} }
-      if (payload && Array.isArray(payload.items)) {
-        return payload.items;
+      const firstPage = await fetchPage(1);
+      const totalPages = Number(firstPage.pagination?.pages || 1);
+
+      if (totalPages <= 1) {
+        return firstPage.items;
       }
 
-      return Array.isArray(payload) ? payload : [];
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2))
+      );
+
+      return [
+        ...firstPage.items,
+        ...remainingPages.flatMap((page) => page.items),
+      ];
     },
   });
 
@@ -37,6 +54,9 @@ function HomeCabinetMap() {
     for (const doctor of doctorsQuery.data || []) {
       const doctorName = doctor.nomComplet || doctor.user?.email || 'Médecin';
       const specialtyLabel = formatSpecialtyLabel(doctor.specialite || 'Médecine générale');
+      const tarifLabel = doctor.tarifConsultation
+        ? `${Number(doctor.tarifConsultation).toLocaleString('fr-FR')} MAD`
+        : 'Tarif non renseigné';
 
       for (const entry of doctor.doctorCabinets || []) {
         const cabinet = entry.cabinet;
@@ -52,21 +72,29 @@ function HomeCabinetMap() {
           cabinetName: cabinet.nom || cabinet.label || 'Cabinet médical',
           ville: cabinet.ville || 'Maroc',
           coords: [latitude, longitude],
-          doctorNames: new Set(),
-          specialties: new Set(),
+          doctorsMap: new Map(),
         };
 
-        current.doctorNames.add(doctorName);
-        current.specialties.add(specialtyLabel);
+        current.doctorsMap.set(doctor.id, {
+          id: doctor.id,
+          name: doctorName,
+          specialty: specialtyLabel,
+          tarifLabel,
+        });
+
         cabinetsById.set(cabinet.id, current);
       }
     }
 
-    return Array.from(cabinetsById.values()).map(({ doctorNames, specialties, ...rest }) => ({
-      ...rest,
-      doctorNames: Array.from(doctorNames),
-      specialties: Array.from(specialties),
-    }));
+    return Array.from(cabinetsById.values()).map(({ doctorsMap, ...rest }) => {
+      const doctorsList = Array.from(doctorsMap.values());
+      return {
+        ...rest,
+        doctors: doctorsList,
+        doctorId: doctorsList.length === 1 ? doctorsList[0].id : undefined,
+        profileHref: doctorsList.length === 1 ? `/doctor/${doctorsList[0].id}` : undefined,
+      };
+    });
   }, [doctorsQuery.data]);
 
   if (doctorsQuery.isLoading) {
@@ -109,7 +137,19 @@ function HomeCabinetMap() {
     );
   }
 
-  return <DoctorSearchMap markerPoints={markerPoints} className="h-[380px]" />;
+  return (
+    <DoctorSearchMap
+      mapKey="home-cabinet-map"
+      markerPoints={markerPoints}
+      className="h-[380px]"
+      onMarkerProfileClick={(marker) => {
+        if (!marker?.doctorId) {
+          return;
+        }
+        navigate(`/doctor/${marker.doctorId}`);
+      }}
+    />
+  );
 }
 
 export default HomeCabinetMap;

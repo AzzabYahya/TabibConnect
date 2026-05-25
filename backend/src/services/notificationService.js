@@ -11,14 +11,12 @@ const createNotification = async ({ userId, type, message, metadata }) => {
       userId,
       type,
       message,
+      metadata: metadata || undefined,
       isRead: false,
     },
   });
 
-  emitToUser(userId, 'notification:new', {
-    ...notification,
-    metadata: metadata || null,
-  });
+  emitToUser(userId, 'notification:new', notification);
 
   return notification;
 };

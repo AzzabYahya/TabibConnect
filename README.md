@@ -4,188 +4,323 @@
 > **Dernière mise à jour :** 20 mai 2026 (Documentation alignée sur le code)  
 > **Objectif :** Ce document centralise TOUTES les informations nécessaires pour une IA ou un développeur.
 
----
+# TabibConnect
+
+> Plateforme web marocaine de prise de rendez-vous médicaux pour les patients, les médecins et les administrateurs.
+>
+> Dernière mise à jour: 24 mai 2026.
+
+TabibConnect est une application full-stack orientée santé qui couvre la recherche de médecins, la prise de rendez-vous, la gestion des profils médicaux, les ordonnances numériques, la modération admin et les notifications temps réel.
+
+La documentation ci-dessous est volontairement complète pour servir de référence de projet. Les captures d’écran existantes sont conservées telles quelles.
+
+## Sommaire
+
+- [Vue d’ensemble](#vue-densemble)
+- [Captures d’écran](#captures-d%C3%A9cran)
+- [Fonctionnalités](#fonctionnalit%C3%A9s)
+- [Architecture technique](#architecture-technique)
+- [Structure du dépôt](#structure-du-d%C3%A9p%C3%B4t)
+- [Démarrage local](#d%C3%A9marrage-local)
+ - [Installation détaillée](INSTALLATION.md)
+- [Variables d’environnement](#variables-denvironnement)
+- [API](#api)
+- [Modèle de données](#mod%C3%A8le-de-donn%C3%A9es)
+- [Jobs et temps réel](#jobs-et-temps-r%C3%A9el)
+- [Sécurité](#s%C3%A9curit%C3%A9)
+- [Tests](#tests)
+- [Docker et production](#docker-et-production)
+- [Données de démonstration](#donn%C3%A9es-de-d%C3%A9monstration)
+- [Recherche et correspondance automatique](#recherche-et-correspondance-automatique)
+- [Contribution](#contribution)
 
 ## 📷 Visuels de la Plateforme (UI/UX)
 
-### 1. Page d'Accueil & Navigation
+## Vue d’ensemble
+
+TabibConnect regroupe trois grands espaces:
+
+- Patient: recherche de médecins, prise de rendez-vous, suivi des rendez-vous, avis, notifications.
+- Médecin: agenda, gestion des disponibilités, dossier patient, notes cliniques, ordonnances, profile management.
+- Admin: vérification des comptes, validation des modifications, supervision des avis, contrôle opérationnel.
+
+Le projet fonctionne avec une API Express, une base PostgreSQL via Prisma, un frontend React/Vite et un canal Socket.IO pour pousser les notifications en temps réel.
+
+## Captures d’écran
+
+### 1. Page d’accueil et navigation
 ![Home Page](frontend/public/docs/screenshots/homepage.png)
-*Une interface moderne et épurée utilisant un design "Glassmorphism". La navigation est intuitive avec un accès rapide à la recherche et aux espaces dédiés.*
+Une entrée visuelle vers la plateforme avec recherche rapide, accès aux profils et mise en avant des parcours principaux.
 
-### 2. Recherche & Pagination intelligente
+### 2. Recherche et pagination intelligente
 ![Search Results](frontend/public/docs/screenshots/search_results.png)
-*Le moteur de recherche affiche désormais une **pagination de 8 docteurs maximum par page**. Le nombre total de médecins trouvés est dynamiquement mis à jour pour garantir une transparence totale.*
+La recherche affiche une liste paginée de médecins avec filtres, tri et regroupement par spécialité.
 
-### 3. Carte interactive — Localisation des médecins
+La barre de recherche de la homepage propose des suggestions en temps réel: spécialités, médecins et symptômes.
+
+### 3. Carte interactive de localisation des médecins
 ![Search Map](frontend/public/docs/screenshots/search_map.png)
-*La carte interactive affiche les cabinets des médecins sur une carte OpenStreetMap avec des **marqueurs clusterisés**. Un clic sur un cluster zoome pour révéler les cabinets individuels avec les informations du praticien.*
+La carte OpenStreetMap montre les cabinets et leur localisation pour aider l’utilisateur à comparer la proximité géographique.
 
-### 4. Connexion Sécurisée
+### 4. Connexion sécurisée
 ![Login Page](frontend/public/docs/screenshots/login.png)
-*Interface de connexion optimisée avec gestion précise des erreurs (ex: "Identifiants incorrects" vs "Erreurs techniques").*
+Connexion avec gestion des erreurs, sessions sécurisées et redirection selon le rôle.
 
-#### 🔑 Comptes de Test
+#### Comptes de test
+
 | Rôle | Email | Mot de passe |
-| :--- | :--- | :--- |
-| **Admin** | `admin@tabibconnect.ma` | `TabibConnect@2026` |
-| **Docteur** | `dr.amine.fassi@tabibconnect.ma` | `TabibConnect@2026` |
-| **Patient** | `youssef.benali@tabibconnect.ma` | `TabibConnect@2026` |
+| --- | --- | --- |
+| Admin | admin@tabibconnect.ma | TabibConnect@2026 |
+| Docteur | dr.amine.fassi@tabibconnect.ma | TabibConnect@2026 |
+| Patient | youssef.benali@tabibconnect.ma | TabibConnect@2026 |
 
-### 5. Dashboard Médecin (Vue Agenda)
+### 5. Dashboard médecin
 ![Doctor Dashboard](frontend/public/docs/screenshots/doctor_dashboard.png)
-*Espace de travail complet pour le praticien. Les icônes et menus sont rendus de manière fluide, et les alertes administratives sont clairement identifiées.*
+Vue d’exploitation du cabinet: agenda, patients du jour, demandes à traiter, avis, disponibilités et gestion du profil.
 
-### 6. Dashboard Administration
+### 6. Dashboard administration
 ![Admin Dashboard](frontend/public/docs/screenshots/admin_dashboard.png)
-*Tour de contrôle pour la validation des nouveaux inscrits et la surveillance de l'activité globale de la plateforme.*
+Poste de supervision pour la validation, la surveillance et les opérations sensibles.
 
----
+## Fonctionnalités
 
-## 🏗️ Architecture Technique
+### Patient
 
-### Stack Technologique
-| Couche | Technologie |
-| :--- | :--- |
-| **Frontend** | React 19, Vite, Tailwind CSS, React Query, React Router v6, i18next |
-| **Backend** | Node.js (Docker Node 22), Express 5, Prisma 6 |
-| **Base de données** | PostgreSQL 16 |
-| **Temps Réel** | Socket.IO (notifications temps reel) |
-| **Securite** | JWT (Access/Refresh), Double CSRF, Helmet + CSP, Rate Limiting |
-| **Jobs** | node-cron (rappels + no-show) |
-| **Paiements** | Stripe (serveur) |
-| **OCR** | tesseract.js (verification CIN) |
-| **Tests** | Jest + Supertest, Vitest, Playwright |
-| **Infra** | Docker, Docker Compose, Nginx |
+- Recherche de médecins par nom, spécialité, symptôme et ville.
+- Suggestions en temps réel sur la homepage.
+- Consultation des profils médecins, avis, tarifs, langues, cabinets et disponibilités.
+- Réservation de rendez-vous en présentiel ou en téléconsultation.
+- Annulation avec règles de fenêtre de temps.
+- Consultation de l’historique et des notifications.
+- Dépôt d’avis après rendez-vous complété.
 
-### Structure des Dossiers
-- `backend/` : API Express, routes `/api/v1`, services metier, Prisma.
-- `frontend/` : App React (Vite), hooks temps reel, UI.
-- `docs/screenshots/` : Captures d'ecran UI (garder intact).
-- `uploads/` : Documents (CIN, photos) isoles et servis via controleurs.
+### Médecin
 
----
+- Tableau de bord avec rendez-vous du jour, demandes à traiter et patients suivis.
+- Confirmation, annulation et complétion d’un rendez-vous.
+- Gestion des disponibilités hebdomadaires par cabinet.
+- Consultation du dossier patient et création de notes cliniques.
+- Création et partage d’ordonnances numériques avec QR code.
+- Téléversement de documents et photo de profil.
+- Demandes de modification de profil ou de localisation soumises à validation admin.
 
-## ⚙️ Demarrage rapide (developpement local)
+### Admin
 
-### Option 1 — Lancer tout depuis la racine
+- Vérification des comptes médecins et des avis.
+- Création de comptes depuis l’espace admin.
+- Supervision des changements de profil et de localisation.
+- Consultation des statistiques globales et des métriques de la plateforme.
+
+## Architecture technique
+
+| Couche | Technologies |
+| --- | --- |
+| Frontend | React 19, Vite, Tailwind CSS, React Query, React Router v6, React Hook Form, Zod, i18next, Framer Motion |
+| Backend | Node.js, Express 5, Prisma 6 |
+| Base de données | PostgreSQL 16 |
+| Cache | Redis optionnel pour certaines données de recherche |
+| Temps réel | Socket.IO |
+| Sécurité | JWT access/refresh, double CSRF, Helmet, CSP, rate limiting |
+| Jobs | node-cron |
+| Documents | Multer, PDFKit, QRCode, Tesseract.js, pdf-parse |
+| Paiement | Stripe |
+| SMS | Twilio |
+| Tests | Jest, Supertest, Vitest, Playwright |
+
+## Structure du dépôt
+
+- `backend/` : API Express, Prisma, services métiers, jobs, scripts de seed.
+- `frontend/` : application React/Vite, pages métier, composants UI, tests frontend.
+- `uploads/` : fichiers servis ou générés par la plateforme.
+- `docs/screenshots/` et `frontend/public/docs/screenshots/` : captures d’écran déjà présentes.
+- `scripts/` : scripts d’exécution multi-services et utilitaires.
+
+## Démarrage local
+
+### Prérequis
+
+- Node.js 22 ou compatible.
+- PostgreSQL 16.
+- Redis si tu veux activer le cache localement.
+
+### Installation
+
 ```bash
 npm --prefix backend install
 npm --prefix frontend install
-npm run dev
 ```
-Ce script lance `npm run dev` dans `backend/` et `frontend/` en parallele.
 
-### Option 2 — Lancer chaque service
-**Backend**
+Pour des instructions d'installation complètes et pas-à-pas (migrations, seed, configuration des services externes), voir [INSTALLATION.md](INSTALLATION.md).
+
+### Lancer les services séparément
+
+Backend:
+
 ```bash
 cd backend
 cp .env.example .env
-npm install
 npm run prisma:generate
 npm run prisma:migrate
-npm run dev # Port 4000
+npm run prisma:seed
+npm run dev
 ```
 
-**Frontend**
+Frontend:
+
 ```bash
 cd frontend
-npm install
-npm run dev # Port 5173
+npm run dev
 ```
 
----
+### Lancer les deux services depuis la racine
 
-## 🧰 Configuration (variables d'environnement)
+```bash
+npm run dev
+```
 
-### Fichiers sources
-- `backend/.env.example` : configuration locale.
-- `.env.production.example` : configuration Docker Compose (prod).
+Le script racine lance le backend et le frontend via `scripts/run-platform.js`.
 
-### Variables principales (backend)
-- `DATABASE_URL` : chaine PostgreSQL.
-- `APP_BASE_URL` / `FRONTEND_URL` : URLs publiques.
-- `CORS_ORIGIN` : origines autorisees (liste CSV).
-- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` : secrets JWT (bloquants en prod si valeurs par defaut).
-- `CSRF_SECRET`, `CSRF_COOKIE_NAME`, `CSRF_HEADER_NAME` : double CSRF.
-- `REFRESH_TOKEN_COOKIE_NAME` : nom du cookie refresh.
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY` : paiements.
-- `SMTP_*` : emails transactionnels.
-- `TWILIO_*` : SMS (optionnel).
-- `FREE_CANCELLATION_HOURS`, `REMINDER_HOURS_BEFORE`, `REMINDER_WINDOW_MINUTES`, `NO_SHOW_GRACE_MINUTES` : politique RDV.
-- `CIN_VERIFICATION_*` : regles OCR CIN (score, mots-cles, langue).
-
-### Variables principales (frontend)
-- `VITE_API_URL` : base API (doit pointer vers `/api/v1`).
-
----
-
-## 🌐 API & Temps reel
-
-### Base URL
-- Dev: `http://localhost:4000/api/v1`
-- Prod: `https://votre-domaine/api/v1`
-
-### Routes API (prefixe `/api/v1`)
-- `/auth` : inscription, login, refresh, csrf-token.
-- `/home` : donnees publiques homepage.
-- `/appointments` : creation, annulation, statut, avis.
-- `/dashboard` : aggregats patient/medecin/admin.
-- `/admin` : validation docs, moderation, actions sensibles.
-- `/doctors` : recherche, profil, disponibilites.
-- `/cabinets` : gestion des cabinets.
-- `/notifications` : listing et marquage.
-- `/payments` : flux de paiement.
-- `/users` : gestion utilisateur.
-- `/patients` : profil patient.
-- `/health` : check API (retourne status + version).
-
-### CSRF + Auth
-- Le frontend recupere `GET /auth/csrf-token` puis envoie `x-csrf-token` sur les mutations.
-- Les appels utilisent `withCredentials` pour les cookies (refresh).
-
-### Temps reel (Socket.IO)
-- Authentification via access token dans le handshake.
-- Abonnement automatique au canal `user:<id>`.
-- Evenement principal: `notification:new`.
-
----
-
-## 📊 Base de Donnees — Schéma Prisma
-
-### Modeles principaux (15)
-- **User** : compte central (role, verification).
-- **Patient** : profil medical, CIN + verifications.
-- **Doctor** : profil medecin, tarif, langues, documents.
-- **Cabinet** : localisation, coordonnees, photos.
-- **Disponibilite** : creneaux hebdomadaires.
-- **RendezVous** : noyau RDV + statut + politique.
-- **Paiement** : statut et methode.
-- **Notification** : events temps reel.
-- **Avis** : notes et commentaires verifies.
-- **DoctorCabinet** : lien N-N.
-- **DoctorPatientNote** : notes medecin-patient.
-- **DoctorDocument** : documents medecin.
-- **PatientDocument** : documents patient.
-- **DoctorChangeRequest** : demandes de modification medecin.
-- **PatientChangeRequest** : demandes de modification patient.
-
----
-
-## 🔐 Securite & Hardening (Audit 05/05/2026)
-
-- Double CSRF global sur toutes les mutations.
-- Secrets par defaut refuses en production.
-- CSP active via Helmet (scripts/styles/fonts/images controles).
-- CORS strict selon `CORS_ORIGIN`.
-- Rate limiting sur l'authentification.
-- Sanitisation d'entree via middleware.
-- Logs d'audit cote admin et suivi des documents.
-
----
-
-## 🧪 Tests
+## Variables d’environnement
 
 ### Backend
+
+Le backend lit ses variables depuis `backend/.env.example` puis `backend/.env`.
+
+- `NODE_ENV` : environnement d’exécution.
+- `PORT` : port backend, par défaut `4000`.
+- `APP_BASE_URL` : URL publique du backend.
+- `FRONTEND_URL` : URL du frontend.
+- `CORS_ORIGIN` : liste CSV des origines autorisées.
+- `DATABASE_URL` : connexion PostgreSQL.
+- `REDIS_URL` : URL Redis pour le cache.
+- `JWT_ACCESS_SECRET` et `JWT_REFRESH_SECRET` : secrets de session.
+- `JWT_ACCESS_EXPIRES_IN` et `JWT_REFRESH_EXPIRES_IN` : durée des tokens.
+- `BCRYPT_SALT_ROUNDS` : coût du hachage des mots de passe.
+- `CSRF_SECRET`, `CSRF_COOKIE_NAME`, `CSRF_HEADER_NAME` : protection CSRF.
+- `REFRESH_TOKEN_COOKIE_NAME` : cookie de refresh token.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY` : paiement carte.
+- `SMTP_*` : emails transactionnels.
+- `TWILIO_*` : SMS transactionnels.
+- `FREE_CANCELLATION_HOURS` : fenêtre d’annulation gratuite.
+- `REMINDER_HOURS_BEFORE`, `REMINDER_WINDOW_MINUTES` : rappel RDV.
+- `NO_SHOW_GRACE_MINUTES` : délai avant bascule en no-show.
+- `UPLOAD_DOCUMENTS_DIR` : dossier de stockage des documents.
+- `EMAIL_VERIFY_TOKEN_EXPIRES_MINUTES` : expiration de vérification email.
+- `RESET_PASSWORD_TOKEN_EXPIRES_MINUTES` : expiration du reset password.
+- `CIN_VERIFICATION_*` : paramétrage OCR et score de vérification CIN.
+
+### Frontend
+
+- `VITE_API_URL` : base d’API utilisée par le frontend.
+
+## API
+
+Base locale: `http://localhost:4000/api/v1`
+
+### Routes publiques et d’authentification
+
+- `/auth` : inscription, connexion, refresh, logout, vérification email, reset password, CSRF token.
+- `/home` : résumé public de la plateforme.
+- `/search` : suggestions et filtres de recherche.
+- `/doctors` : listing, profil public, disponibilités, avis.
+- `/cabinets` : consultation des cabinets.
+- `/health` : état du service.
+
+### Routes protégées principales
+
+- `/appointments` : création, annulation, confirmation, complétion, reprogrammation, notes, avis, ordonnances.
+- `/dashboard` : dashboards patient, médecin et admin.
+- `/admin` : validation comptes, avis, comptes créés par admin.
+- `/notifications` : consultation et marquage des notifications.
+- `/payments` : gestion des flux de paiement.
+- `/users` : gestion des comptes.
+- `/patients` : profil et données patient.
+- `/ordonnance/verify/:qrCode` : vérification publique d’une ordonnance.
+
+### Parcours rendez-vous
+
+Statuts disponibles dans la base:
+
+- `EN_ATTENTE`
+- `CONFIRME`
+- `ANNULE`
+- `COMPLETE`
+- `NO_SHOW`
+
+Flux métier courant:
+
+1. Le patient crée un rendez-vous en `EN_ATTENTE`.
+2. Le médecin peut le `CONFIRME`.
+3. Le médecin peut ensuite le passer en `COMPLETE` quand la consultation est finie.
+4. Un rendez-vous non honoré peut être basculé automatiquement en `NO_SHOW` par les jobs.
+5. Les avis patient ne sont autorisés qu’après un rendez-vous `COMPLETE`.
+
+### Ordonnance numérique
+
+- Création d’une ordonnance liée au rendez-vous.
+- Génération de PDF avec QR code.
+- Upload de document possible.
+- Renvoi par email.
+- Vérification publique via QR code.
+
+### CSRF et session
+
+- Le frontend récupère un token CSRF via `/auth/csrf-token`.
+- Les mutations envoient l’en-tête `x-csrf-token`.
+- Les cookies de refresh sont utilisés avec `withCredentials`.
+
+### Temps réel
+
+- Socket.IO authentifié via access token.
+- Canal utilisateur: `user:<id>`.
+- Événement principal de notification: `notification:new`.
+
+## Modèle de données
+
+Le schéma Prisma centralise les entités suivantes:
+
+- `User` : compte de base, rôle, tokens, vérification.
+- `Patient` : profil patient, CIN, avertissements, antécédents.
+- `Doctor` : profil médecin, spécialité, langues, diplômes, tarifs.
+- `Cabinet` : localisation, coordonnées, photos.
+- `Disponibilite` : créneaux hebdomadaires.
+- `RendezVous` : rendez-vous, statut, paiements, avis, ordonnances.
+- `Paiement` : état et méthode du paiement.
+- `Ordonnance` : prescription numérique.
+- `Notification` : messages temps réel et système.
+- `Avis` : note et commentaire post-consultation.
+- `DoctorCabinet` : relation médecin/cabinet.
+- `DoctorPatientNote` : notes cliniques médecin-patient.
+- `DoctorDocument` et `PatientDocument` : documents uploadés.
+- `DoctorChangeRequest` et `PatientChangeRequest` : modifications soumises à validation.
+- `AuditLog` : traçabilité admin et événements métier.
+
+## Jobs et temps réel
+
+Le backend lance deux tâches cron principales:
+
+- Rappel rendez-vous à l’approche de la consultation.
+- Détection automatique des no-show après le délai de grâce.
+
+Le calendrier des jobs est défini dans `backend/src/jobs/appointmentJobs.js`.
+
+Le délai de passage en no-show est configuré via `NO_SHOW_GRACE_MINUTES`.
+
+## Sécurité
+
+- Double protection CSRF sur les mutations.
+- CORS limité aux origines configurées.
+- Helmet et Content Security Policy actifs.
+- Secrets par défaut refusés en production.
+- Rate limiting sur l’authentification.
+- Nettoyage des entrées via middleware.
+- Contrôles de rôle sur toutes les routes sensibles.
+- Documents et uploads servis par contrôleur, pas en exposition brute.
+
+## Tests
+
+### Backend
+
 ```bash
 npm --prefix backend test
 npm --prefix backend test:watch
@@ -194,44 +329,76 @@ npm --prefix backend test:etape5:mvp
 ```
 
 ### Frontend
+
 ```bash
 npm --prefix frontend test
 npm --prefix frontend test:watch
 npm --prefix frontend test:e2e
+npm --prefix frontend run build
+npm --prefix frontend run lint
 ```
 
----
+## Docker et production
 
-## 🐳 Docker & Production
+Le fichier `docker-compose.yml` orchestre:
 
-1. Copier `.env.production.example` en `.env.production`.
-2. Ajuster secrets, URLs et `VITE_API_URL`.
-3. Lancer:
+- PostgreSQL
+- Redis
+- Backend
+- Frontend
+- Nginx reverse proxy
+- Certbot en option
+
+### Démarrage
+
 ```bash
 docker compose up -d --build
 ```
 
-Services: Postgres, Redis, Backend (4000), Frontend (Nginx), Nginx reverse proxy + Certbot (optionnel).
+### Points à préparer
 
----
+1. Créer un fichier `.env.production`.
+2. Renseigner les secrets applicatifs.
+3. Ajuster `DATABASE_URL`, `REDIS_URL`, `APP_BASE_URL`, `FRONTEND_URL` et `VITE_API_URL`.
+4. Vérifier le domaine Nginx / Certbot si le projet est exposé en public.
 
-## 🤖 Guide IA — Patterns & Logique Metier
+## Données de démonstration
 
-- **Services Layer** : logique metier dans `backend/src/services/`.
-- **Transactions** : creation RDV + paiement dans une transaction Prisma.
-- **File Serving** : documents servis par controleur (pas de static direct).
-- **Realtime** : notifications Socket.IO pour dashboards.
+Le seed remplit la base avec des comptes de démonstration et des données métier réalistes:
 
----
+- Patients de test.
+- Médecins de test.
+- Cabinets marocains.
+- Créneaux de disponibilité.
+- Documents et photos stockés dans des fichiers locaux du dépôt.
 
-## 📋 Historique & Contribution
+Les comptes de test visibles plus haut correspondent aux seeds actuels.
 
-- **v1.0.3 (Mai 2026)** : Documentation re-sync + details config.
-- **v1.0.2 (Mai 2026)** : Audit de securite complet, pagination de 8, hardening global.
-- **v1.0.1 (Avril 2026)** : Documentation et captures d'ecran.
-- **v1.0.0 (Avril 2026)** : Lancement initial (MVP).
+## Recherche et correspondance automatique
 
-**Regles de contribution :**
-- Secrets jamais commites.
-- Tests obligatoires pour tout changement metier.
-- Utiliser `resolveImageUrl` pour tout affichage d image venant du backend.
+Le moteur de recherche n’utilise pas encore de vrai modèle IA génératif.
+
+À ce stade, la plateforme repose sur:
+
+- un mappage symptômes → spécialités en français et en arabe,
+- du fuzzy matching pour tolérer les fautes de frappe,
+- un tri par pertinence,
+- des suggestions regroupées par spécialités, médecins et symptômes,
+- des filtres de recherche synchronisés avec la base de données,
+- des villes récupérées depuis les données publiques.
+
+Le libellé produit côté accueil est donc volontairement orienté vers une correspondance automatique, pas vers une promesse d’IA avancée.
+
+## Contribution
+
+- Ne jamais committer de secrets.
+- Ne pas modifier les captures d’écran tant qu’elles restent valides.
+- Garder les changements métier couverts par des tests quand c’est possible.
+- Préférer les données réellement synchronisées avec la base plutôt que des listes figées côté frontend.
+- Respecter les conventions de thème UI clair et médical déjà en place.
+
+## Notes utiles
+
+- Le backend expose aussi les ordonnances PDF via `/uploads/ordonnances`.
+- Le frontend utilise React Query pour la plupart des fetchs métier.
+- Les suggestions d’accueil, les filtres de recherche et certains tableaux de bord lisent les données directement depuis l’API, pas depuis des mocks.

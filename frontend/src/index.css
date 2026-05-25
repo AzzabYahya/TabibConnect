@@ -127,7 +127,7 @@ html[dir='rtl'] .leaflet-container {
 }
 
 .infinite-scroll-track {
-  animation: infiniteScroll 30s linear infinite;
+  animation: infiniteScroll 50s linear infinite;
 }
 
 .infinite-scroll-track:hover {
@@ -151,6 +151,18 @@ html[dir='rtl'] .leaflet-container {
 
   to {
     background-position: 200% 0%;
+  }
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -34,13 +34,13 @@ const sendAppointmentCreatedNotifications = async (appointment) => {
       userId: appointment.patient?.userId,
       type: 'SYSTEME',
       message: `Votre demande de rendez-vous du ${dateLabel} a ete enregistree.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'CREATED' },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'SYSTEME',
       message: `Nouvelle demande de rendez-vous pour le ${dateLabel}.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'CREATED' },
     }),
     sendAppointmentCreatedEmail({
       to: appointment.patient?.user?.email,
@@ -72,13 +72,13 @@ const sendAppointmentConfirmedNotifications = async (appointment) => {
       userId: appointment.patient?.userId,
       type: 'RDV_CONFIRME',
       message: `Votre rendez-vous du ${dateLabel} avec ${doctorName} est confirme.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'CONFIRMED' },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'RDV_CONFIRME',
       message: `Rendez-vous du ${dateLabel} confirme pour ${getPatientName(appointment)}.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'CONFIRMED' },
     }),
     sendAppointmentConfirmationEmail({
       to: appointment.patient?.user?.email,
@@ -112,7 +112,10 @@ const sendAppointmentCancelledNotifications = async ({ appointment, cancelledByR
       message: `Le rendez-vous du ${dateLabel} a ete annule par ${by}.`,
       metadata: {
         appointmentId: appointment.id,
+        category: 'RENDEZ_VOUS',
+        event: 'CANCELLED',
         freeCancellation,
+        cancelledByRole,
       },
     }),
     createNotification({
@@ -121,7 +124,10 @@ const sendAppointmentCancelledNotifications = async ({ appointment, cancelledByR
       message: `Le rendez-vous du ${dateLabel} a ete annule par ${by}.`,
       metadata: {
         appointmentId: appointment.id,
+        category: 'RENDEZ_VOUS',
+        event: 'CANCELLED',
         freeCancellation,
+        cancelledByRole,
       },
     }),
     sendAppointmentCancellationEmail({
@@ -155,13 +161,13 @@ const sendAppointmentReminderNotifications = async (appointment) => {
       userId: appointment.patient?.userId,
       type: 'RAPPEL_RDV',
       message: `Rappel: vous avez un rendez-vous le ${dateLabel}.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'REMINDER' },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'RAPPEL_RDV',
       message: `Rappel: rendez-vous prevu le ${dateLabel}.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'REMINDER' },
     }),
     sendAppointmentReminderEmail({
       to: appointment.patient?.user?.email,
@@ -192,13 +198,13 @@ const sendAppointmentNoShowNotifications = async (appointment) => {
       userId: appointment.patient?.userId,
       type: 'SYSTEME',
       message: `Le rendez-vous du ${dateLabel} est passe en statut NO_SHOW.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'NO_SHOW' },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'SYSTEME',
       message: `Le rendez-vous du ${dateLabel} est passe en statut NO_SHOW.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'NO_SHOW' },
     }),
     sendAppointmentNoShowEmail({
       to: appointment.patient?.user?.email,
@@ -229,13 +235,13 @@ const sendAppointmentCompletedNotifications = async (appointment) => {
       userId: appointment.patient?.userId,
       type: 'SYSTEME',
       message: `Votre rendez-vous du ${dateLabel} est termine.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'COMPLETED' },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'SYSTEME',
       message: `Rendez-vous du ${dateLabel} termine pour ${getPatientName(appointment)}.`,
-      metadata: { appointmentId: appointment.id },
+      metadata: { appointmentId: appointment.id, category: 'RENDEZ_VOUS', event: 'COMPLETED' },
     }),
     sendAppointmentCompletedEmail({
       to: appointment.patient?.user?.email,
@@ -267,13 +273,25 @@ const sendAppointmentRescheduledNotifications = async ({ appointment, previousDa
       userId: appointment.patient?.userId,
       type: 'SYSTEME',
       message: `Votre rendez-vous a ete reprogramme du ${previousLabel} au ${dateLabel}.`,
-      metadata: { appointmentId: appointment.id, rescheduledByRole, reason },
+      metadata: {
+        appointmentId: appointment.id,
+        category: 'RENDEZ_VOUS',
+        event: 'RESCHEDULED',
+        rescheduledByRole,
+        reason,
+      },
     }),
     createNotification({
       userId: appointment.doctor?.userId,
       type: 'SYSTEME',
       message: `Rendez-vous reprogramme du ${previousLabel} au ${dateLabel}.`,
-      metadata: { appointmentId: appointment.id, rescheduledByRole, reason },
+      metadata: {
+        appointmentId: appointment.id,
+        category: 'RENDEZ_VOUS',
+        event: 'RESCHEDULED',
+        rescheduledByRole,
+        reason,
+      },
     }),
     sendAppointmentRescheduledEmail({
       to: appointment.patient?.user?.email,

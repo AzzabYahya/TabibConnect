@@ -19,13 +19,7 @@ const genderLabels = {
   FEMME: 'Femme',
 };
 
-const notificationTitles = {
-  RAPPEL_RDV: 'Rappel de rendez-vous',
-  RDV_CONFIRME: 'Rendez-vous confirme',
-  RDV_ANNULE: 'Rendez-vous annule',
-  PAIEMENT_RECU: 'Paiement recu',
-  SYSTEME: 'Information systeme',
-};
+const { mapNotification } = require('../utils/notificationMapper');
 
 const timeFormatter = new Intl.DateTimeFormat('fr-MA', {
   day: '2-digit',
@@ -254,15 +248,6 @@ const mapAppointment = (appointment, now) => {
   };
 };
 
-const mapNotification = (notification) => ({
-  id: notification.id,
-  type: notification.type,
-  title: notificationTitles[notification.type] || 'Notification',
-  body: notification.message,
-  time: buildRelativeLabel(notification.createdAt),
-  isRead: notification.isRead,
-});
-
 const getPatientDashboard = async ({ userId }) => {
   const patient = await getPatientContext(userId);
   const now = new Date();
@@ -411,7 +396,7 @@ const getPatientDashboard = async ({ userId }) => {
     upcomingAppointment,
     historyAppointments,
     favoriteDoctors,
-    notifications: notifications.map(mapNotification),
+    notifications: notifications.map((notification) => mapNotification(notification, { userRole: 'PATIENT' })),
     medicalProfile: {
       cin: patient.cin,
       address: patient.adresse,
@@ -530,7 +515,7 @@ const getPatientNotifications = async ({ userId, page = 1, limit = 20 }) => {
   ]);
 
   return {
-    items: notifications.map(mapNotification),
+    items: notifications.map((notification) => mapNotification(notification, { userRole: 'PATIENT' })),
     pagination: {
       page: currentPage,
       limit: pageSize,
@@ -542,10 +527,13 @@ const getPatientNotifications = async ({ userId, page = 1, limit = 20 }) => {
   };
 };
 
-const markPatientNotificationsRead = async ({ userId }) => {
+const markPatientNotificationsRead = async ({ userId, ids = null }) => {
   const patient = await getPatientContext(userId);
+  const where = Array.isArray(ids) && ids.length
+    ? { userId: patient.userId, id: { in: ids }, isRead: false }
+    : { userId: patient.userId, isRead: false };
   const result = await prisma.notification.updateMany({
-    where: { userId: patient.userId, isRead: false },
+    where,
     data: { isRead: true },
   });
   return { updated: result.count };

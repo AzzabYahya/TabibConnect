@@ -9,7 +9,7 @@ import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import RegisterPage from '../pages/RegisterPage';
-import SettingsPage from '../pages/SettingsPage';
+import SettingsRedirectPage from '../pages/SettingsRedirectPage';
 import PaymentSuccessPage from '../pages/PaymentSuccessPage';
 import PaymentCancelPage from '../pages/PaymentCancelPage';
 import AdminDashboardLayout from '../layout/AdminDashboardLayout';
@@ -41,6 +41,7 @@ const doctorStatsPageLoader = lazy(() => import('../pages/DoctorStatsPage'));
 const doctorReviewsPageLoader = lazy(() => import('../pages/DoctorReviewsPage'));
 
 const patientProfilePageLoader = lazy(() => import('../pages/PatientProfilePage'));
+const accountPageLoader = lazy(() => import('../pages/AccountPage'));
 
 const withRouteSuspense = (element) => (
   <Suspense
@@ -96,7 +97,7 @@ const router = createBrowserRouter([
         path: 'settings',
         element: (
           <PrivateRoute>
-            <SettingsPage />
+            <SettingsRedirectPage />
           </PrivateRoute>
         ),
       },
@@ -132,6 +133,7 @@ const router = createBrowserRouter([
           { path: 'availability', element: withRouteSuspense(createElement(doctorAvailabilityPageLoader)) },
           { path: 'patients', element: withRouteSuspense(createElement(doctorPatientsPageLoader)) },
           { path: 'profile', element: withRouteSuspense(createElement(doctorProfileCabinetPageLoader)) },
+          { path: 'account', element: withRouteSuspense(createElement(accountPageLoader)) },
           { path: 'stats', element: withRouteSuspense(createElement(doctorStatsPageLoader)) },
           { path: 'reviews', element: withRouteSuspense(createElement(doctorReviewsPageLoader)) },
         ],
@@ -187,6 +189,10 @@ const router = createBrowserRouter([
           {
             path: 'appointments',
             element: withRouteSuspense(createElement(adminAppointmentsPageLoader)),
+          },
+          {
+            path: 'account',
+            element: withRouteSuspense(createElement(accountPageLoader)),
           },
         ],
 

@@ -9,6 +9,7 @@ const doctorListValidator = [
   query('minNote').optional().isFloat({ min: 0, max: 5 }),
   query('maxTarif').optional().isFloat({ min: 0 }),
   query('langue').optional().trim().isLength({ min: 2, max: 50 }),
+  query('langues').optional().trim().isLength({ min: 2, max: 120 }),
   query('videoOnly').optional().isBoolean().toBoolean(),
   query('sexe').optional().isIn(['TOUT', 'HOMME', 'FEMME']),
 ];

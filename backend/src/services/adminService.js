@@ -6,6 +6,7 @@ const env = require('../config/env');
 const { sendMail } = require('./emailService');
 const { sendSms } = require('./smsService');
 const { verifyCinDocument } = require('./cinVerificationService');
+const { mapNotification } = require('../utils/notificationMapper');
 
 const toDisplayName = (email) => {
   const localPart = String(email || '')
@@ -1659,14 +1660,9 @@ const getAdminNotifications = async ({ page, limit, isRead = 'ALL', search = '' 
   ]);
 
   return {
-    items: items.map((n) => ({
-      id: n.id,
-      type: n.type,
-      message: n.message,
-      isRead: n.isRead,
-      createdAt: n.createdAt,
-      user: n.user,
-    })),
+    items: items.map((notification) =>
+      mapNotification(notification, { userRole: 'ADMIN', includeUser: true })
+    ),
     pagination: {
       page: safePage,
       limit: safeLimit,

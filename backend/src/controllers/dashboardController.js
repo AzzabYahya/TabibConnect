@@ -38,7 +38,8 @@ const getPatientNotifications = async (req, res) => {
 };
 
 const markPatientNotificationsRead = async (req, res) => {
-  const data = await dashboardService.markPatientNotificationsRead({ userId: req.user.id });
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+  const data = await dashboardService.markPatientNotificationsRead({ userId: req.user.id, ids });
   res.status(200).json({ status: 'success', data });
 };
 

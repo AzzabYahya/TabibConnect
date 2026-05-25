@@ -19,7 +19,8 @@ import {
   Video,
   XCircle,
 } from 'lucide-react';
-import { CircleMarker, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { CircleMarker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import SafeMapContainer from '../components/common/SafeMapContainer';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -131,7 +132,13 @@ function LocationPickerMap({ latitude, longitude, onPick }) {
         </button>
       </div>
       <div className="h-64 overflow-hidden rounded-xl border border-slate-200">
-        <MapContainer center={center} zoom={hasSelectedPoint ? 14 : 6} scrollWheelZoom={false} className="h-full w-full">
+        <SafeMapContainer
+          mapKey={`doctor-location-picker-${hasSelectedPoint ? `${selectedLat}-${selectedLng}` : 'default'}`}
+          center={center}
+          zoom={hasSelectedPoint ? 14 : 6}
+          scrollWheelZoom={false}
+          className="h-full w-full"
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -145,7 +152,7 @@ function LocationPickerMap({ latitude, longitude, onPick }) {
               pathOptions={{ color: '#1A6B8A', fillColor: '#2ECC8F', fillOpacity: 0.85 }}
             />
           ) : null}
-        </MapContainer>
+        </SafeMapContainer>
       </div>
       <p className="text-xs text-slate-500">
         Cliquez sur la carte pour choisir la localisation exacte du cabinet.
@@ -250,6 +257,7 @@ function DashboardDoctorPage() {
   const cabinets = dashboard.cabinets || [];
   const todayPatients = dashboard.todayPatients || [];
   const pendingRequests = dashboard.pendingRequests || [];
+  const upcomingAppointments = dashboard.upcomingAppointments || [];
   const patientDirectory = dashboard.patientDirectory || [];
   const recentReviews = dashboard.recentReviews || [];
   const publicProfile = dashboard.publicProfile || {};
@@ -289,6 +297,24 @@ function DashboardDoctorPage() {
       toast.error(error?.response?.data?.message || 'Impossible d annuler ce rendez-vous.');
     }
   };
+
+  const handleCompleteAppointment = async (appointment) => {
+    if (!window.confirm(`Marquer le rendez-vous de ${appointment.patientName} comme complété ?`)) {
+      return;
+    }
+
+    try {
+      await api.put(`/appointments/${appointment.id}/complete`);
+      toast.success(`Rendez-vous complété pour ${appointment.patientName}.`);
+      await refreshDashboard();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Impossible de compléter ce rendez-vous.');
+    }
+  };
+
+  const actionableAppointments = [...upcomingAppointments]
+    .filter((appointment) => ['EN_ATTENTE', 'CONFIRME'].includes(appointment.status))
+    .sort((left, right) => new Date(left.dateTime).getTime() - new Date(right.dateTime).getTime());
 
   if (dashboardQuery.isLoading) {
     return (
@@ -720,12 +746,12 @@ function DashboardDoctorPage() {
             <CalendarDays className="text-med-secondary" />
             <div>
               <h2 className="text-xl font-bold text-slate-900">Rendez-vous à traiter</h2>
-              <p className="text-sm text-slate-600">Les confirmations et annulations passent par les vraies routes API.</p>
+              <p className="text-sm text-slate-600">Confirmer, annuler ou compléter selon le statut du rendez-vous.</p>
             </div>
           </div>
 
           <div className="space-y-4">
-            {pendingRequests.map((appointment) => (
+            {actionableAppointments.map((appointment) => (
               <Card key={appointment.id} className="space-y-4 bg-slate-50/90">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -742,11 +768,19 @@ function DashboardDoctorPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button className="gap-2" onClick={() => handleConfirmAppointment(appointment)}>
+                  <Button className="gap-2" onClick={() => handleConfirmAppointment(appointment)} disabled={appointment.status !== 'EN_ATTENTE'}>
                     <CheckCircle2 size={14} /> Confirmer
                   </Button>
-                  <Button variant="outline" className="gap-2" onClick={() => handleCancelAppointment(appointment)}>
+                  <Button variant="outline" className="gap-2" onClick={() => handleCancelAppointment(appointment)} disabled={!['EN_ATTENTE', 'CONFIRME'].includes(appointment.status)}>
                     <XCircle size={14} /> Annuler
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => handleCompleteAppointment(appointment)}
+                    disabled={appointment.status !== 'CONFIRME'}
+                  >
+                    <CheckCircle2 size={14} /> Marquer complété
                   </Button>
                   <Button variant="ghost" className="gap-2" onClick={() => navigate(`/appointment/${appointment.id}`)}>
                     <FileText size={14} /> Ouvrir
@@ -754,9 +788,9 @@ function DashboardDoctorPage() {
                 </div>
               </Card>
             ))}
-            {pendingRequests.length === 0 ? (
+            {actionableAppointments.length === 0 ? (
               <Card className="bg-emerald-50/70 text-emerald-900">
-                Aucun rendez-vous en attente pour le moment.
+                Aucun rendez-vous à traiter pour le moment.
               </Card>
             ) : null}
           </div>
@@ -817,6 +851,15 @@ function DashboardDoctorPage() {
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" className="gap-2" onClick={() => navigate(`/appointment/${patient.id}`)}>
                     <MessageSquare size={14} /> Détail
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => handleCompleteAppointment(patient)}
+                    disabled={patient.status !== 'CONFIRME'}
+                  >
+                    <CheckCircle2 size={14} /> Marquer complété
                   </Button>
                 </div>
               </Card>
